@@ -6,3 +6,6 @@ coverage/
 !.env.example
 .DS_Store
 docker/secrets/
+
+# TypeScript build cache
+*.tsbuildinfo
