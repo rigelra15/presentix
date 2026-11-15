@@ -1,22 +1,22 @@
-import { Test, TestingModule } from '@nestjs/testing';
+import type { DataSource } from 'typeorm';
 import { AppController } from './app.controller.js';
-import { AppService } from './app.service.js';
 
-describe('AppController', () => {
-  let appController: AppController;
+describe('AppController.health', () => {
+  it('returns ok when the database answers', async () => {
+    const dataSource = { query: async () => [{ 1: 1 }] } as unknown as DataSource;
+    const controller = new AppController(dataSource);
 
-  beforeEach(async () => {
-    const app: TestingModule = await Test.createTestingModule({
-      controllers: [AppController],
-      providers: [AppService],
-    }).compile();
-
-    appController = app.get<AppController>(AppController);
+    expect(await controller.health()).toEqual({ status: 'ok', service: 'employee-service' });
   });
 
-  describe('root', () => {
-    it('should return "Hello World!"', () => {
-      expect(appController.getHello()).toBe('Hello World!');
-    });
+  it('returns 503 when the database is down', async () => {
+    const dataSource = {
+      query: async () => {
+        throw new Error('connection refused');
+      },
+    } as unknown as DataSource;
+    const controller = new AppController(dataSource);
+
+    await expect(controller.health()).rejects.toThrow('Database is not reachable');
   });
 });
