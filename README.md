@@ -220,6 +220,10 @@ account. It is meant for accounts created by mistake, so it is only allowed when
 
 All endpoints except login need `Authorization: Bearer <token>`.
 
+Both services also have `GET /health` (no token needed). It returns
+`{ "status": "ok" }` when the service is running and its database answers,
+or `503` when the database cannot be reached.
+
 ### employee-service (:3000)
 
 | Method | Path             | Role | Description                    |
@@ -278,7 +282,7 @@ and only the file name is stored in the database.
 ```bash
 npm run build      # build all apps
 npm run lint       # lint all apps
-npm test           # unit tests (backend)
+npm test           # unit tests (backend: login rules, employee codes, delete rules, check-in validation)
 npm run db:down    # stop MySQL (data is kept in the Docker volume)
 ```
 
