@@ -1,0 +1,171 @@
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { DataSource, QueryFailedError } from "typeorm";
+import type { Repository } from "typeorm";
+import * as argon2 from 'argon2';
+
+import { Employee } from "./entities/employee.entity.js";
+import { User } from "../users/entities/user.entity.js";
+import { UserRole } from "../users/user-role.enum.js";
+import type { CreateEmployeeDto } from "./dto/create-employee.dto.js";
+import type { UpdateEmployeeDto } from "./dto/update-employee.dto.js";
+
+@Injectable()
+export class EmployeesService {
+  constructor(
+    @InjectRepository(Employee)
+    private readonly employees: Repository<Employee>,
+    private readonly dataSource: DataSource,
+  ) { }
+
+  private toResponse(employee: Employee) {
+    return {
+      id: employee.id,
+      employeeCode: employee.employeeCode,
+      fullName: employee.fullName,
+      department: employee.department,
+      isActive: employee.isActive,
+      email: employee.user.email,
+    };
+  }
+
+  private handleDuplicate(error: unknown): void {
+    if (
+      error instanceof QueryFailedError &&
+      (error.driverError as { code?: string })?.code === 'ER_DUP_ENTRY'
+    ) {
+      throw new ConflictException(
+        'Email or employee code already exists',
+      );
+    }
+  }
+
+  async findAll() {
+    const employees = await this.employees.find({
+      relations: { user: true },
+      order: { id: 'ASC' },
+    });
+
+    return employees.map((employee) =>
+      this.toResponse(employee),
+    );
+  }
+
+  async findOne(id: number) {
+    const employee = await this.employees.findOne({
+      where: { id },
+      relations: { user: true },
+    });
+
+    if (!employee) {
+      throw new NotFoundException('Employee not found');
+    }
+
+    return this.toResponse(employee);
+  }
+
+  async create(dto: CreateEmployeeDto) {
+    let employeeId: number;
+
+    try {
+      employeeId = await this.dataSource.transaction(
+        async (manager) => {
+          const user = manager.create(User, {
+            email: dto.email,
+            passwordHash: await argon2.hash(
+              dto.password,
+              { type: argon2.argon2id },
+            ),
+            role: UserRole.EMPLOYEE,
+          });
+
+          await manager.save(User, user);
+
+          const employee = manager.create(Employee, {
+            user,
+            employeeCode: dto.employeeCode,
+            fullName: dto.fullName,
+            department: dto.department,
+            isActive: true,
+          });
+
+          const saved = await manager.save(
+            Employee,
+            employee,
+          );
+
+          return saved.id;
+        },
+      );
+    } catch (error) {
+      this.handleDuplicate(error);
+      throw error;
+    }
+
+    return this.findOne(employeeId);
+  }
+
+  async update(id: number, dto: UpdateEmployeeDto) {
+    if (Object.keys(dto).length === 0) {
+      throw new BadRequestException(
+        'At least one field is required',
+      );
+    }
+
+    try {
+      await this.dataSource.transaction(async (manager) => {
+        const employee = await manager
+          .getRepository(Employee)
+          .findOne({
+            where: { id },
+            relations: { user: true },
+          });
+
+        if (!employee) {
+          throw new NotFoundException('Employee not found')
+        }
+
+        if (dto.email !== undefined) {
+          employee.user.email = dto.email;
+          await manager.save(User, employee.user);
+        }
+
+        if (dto.employeeCode !== undefined) {
+          employee.employeeCode = dto.employeeCode;
+        }
+
+        if (dto.fullName !== undefined) {
+          employee.fullName = dto.fullName;
+        }
+
+        if (dto.department !== undefined) {
+          employee.department = dto.department;
+        }
+
+        if (dto.isActive !== undefined) {
+          employee.isActive = dto.isActive;
+        }
+
+        await manager.save(Employee, employee);
+      });
+    } catch (error) {
+      this.handleDuplicate(error);
+      throw error;
+    }
+
+    return this.findOne(id);
+  }
+
+  async deactivate(id: number) {
+    const result = await this.employees.update(
+      { id },
+      { isActive: false },
+    );
+
+    if (!result.affected) {
+      throw new NotFoundException('Employee not found');
+    }
+
+    return this.findOne(id);
+  }
+}
