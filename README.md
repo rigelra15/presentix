@@ -123,6 +123,8 @@ npm run check:login
   unique index in the database
 - After check-in, the employee sees their own photo, agenda and location
 - Attendance history, with a detail page for each check-in (photo, agenda, map)
+- Monthly calendar: checked-in days are green, missed work days red,
+  weekends grey (see "Attendance calendar" below)
 
 **HRD**
 - Overview: active employees, who checked in today (with their agenda), and who has not
@@ -132,6 +134,8 @@ npm run check:login
   has no attendance (see "Delete" below). Every one of these actions asks for
   confirmation in a modal first
 - Monitor all attendance: search by name or code, filter by department and date
+- Calendar view: per day, how many employees checked in (e.g. `2/3`), or
+  checked in / absent for one selected employee. Click a day to open it
 - Attendance detail: photo, check-in info, agenda and a map of the location
   (MapLibre GL JS with the free OpenFreeMap Positron style, no API key needed,
   plus a link to Google Maps)
@@ -167,6 +171,17 @@ user is sent back to the login page.
   server records its own time and stores the GPS accuracy so HRD can spot
   unusual check-ins. Stronger checks (e.g. office geofencing, face matching)
   are out of scope for this project.
+
+### Attendance calendar
+
+A day counts as **absent** when it is a past work day (Monday–Friday) with no
+check-in. Days before the employee's account was created are not counted, and
+today only becomes absent after it is over. Public holidays are not known by
+the app, so they show as absent if nobody checks in.
+
+In the HRD team view, the expected employees for a day are the currently
+active employees who already existed on that day (status changes are not
+kept as history).
 
 ### Address lookup (reverse geocoding)
 
