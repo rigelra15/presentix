@@ -128,7 +128,9 @@ npm run check:login
 - Overview: active employees, who checked in today (with their agenda), and who has not
 - Add, view, and update employees. On "Add employee" the next free code
   (`EMP-0001`, `EMP-0002`, ...) is filled in automatically and can still be changed
-- Deactivate / reactivate employees (see "Delete" below)
+- Deactivate / reactivate employees, and permanently delete an employee that
+  has no attendance (see "Delete" below). Every one of these actions asks for
+  confirmation in a modal first
 - Monitor all attendance: search by name or code, filter by department and date
 - Attendance detail: photo, check-in info, agenda and a map of the location
   (MapLibre GL JS with the free OpenFreeMap Positron style, no API key needed,
@@ -180,12 +182,22 @@ The address is not stored in the database. If the lookup fails, only the
 coordinates are shown. Note that this sends the check-in coordinates to
 OpenStreetMap's server.
 
-### Why "delete" is a deactivate
+### Deactivate vs. permanent delete
 
 `DELETE /employees/:id` sets `is_active = false` instead of removing the row.
 Attendance records point to the employee, so hard-deleting an employee would
 leave attendance history without an owner. A deactivated employee cannot log
-in, and HRD can reactivate them later.
+in, and HRD can reactivate them later. This is the normal way to "remove" an
+employee.
+
+`DELETE /employees/:id/permanent` really removes the employee and their login
+account. It is meant for accounts created by mistake, so it is only allowed when:
+
+1. the employee is already deactivated (so they cannot check in while being
+   deleted), and
+2. they have **no** attendance records. employee-service asks
+   attendance-service (`GET /attendances?employeeId=<id>`, with the HRD's
+   token). If attendance-service cannot be reached, nothing is deleted.
 
 ## API
 
@@ -203,6 +215,7 @@ All endpoints except login need `Authorization: Bearer <token>`.
 | POST   | `/employees`     | HRD  | Create employee + login account |
 | PATCH  | `/employees/:id` | HRD  | Update / reactivate employee   |
 | DELETE | `/employees/:id` | HRD  | Deactivate employee            |
+| DELETE | `/employees/:id/permanent` | HRD | Delete employee for good (see above) |
 
 ### attendance-service (:3001)
 
@@ -210,7 +223,7 @@ All endpoints except login need `Authorization: Bearer <token>`.
 | ------ | ------------------------ | --------------- | ----------------------------------- |
 | POST   | `/attendances`           | EMPLOYEE        | Check in (multipart, see below)     |
 | GET    | `/attendances/me`        | EMPLOYEE        | Own attendance history              |
-| GET    | `/attendances`           | HRD             | All attendance                      |
+| GET    | `/attendances`           | HRD             | All attendance (`?employeeId=` filter) |
 | GET    | `/attendances/:id`       | HRD / owner     | Attendance detail                   |
 | GET    | `/attendances/:id/photo` | HRD / owner     | Check-in photo                      |
 
@@ -269,6 +282,7 @@ Defaults work for local development. These environment variables can override th
 | `DB_PASSWORD_FILE`      | both services      | `docker/secrets/<service>_db_password`     |
 | `JWT_SECRET_FILE`       | employee-service   | `docker/secrets/jwt_access_secret`         |
 | `EMPLOYEE_SERVICE_URL`  | attendance-service | `http://127.0.0.1:3000`                    |
+| `ATTENDANCE_SERVICE_URL` | employee-service  | `http://127.0.0.1:3001`                    |
 | `ATTENDANCE_PHOTO_DIR`  | attendance-service | `storage/attendance-photos`                |
 | `EMPLOYEE_API_URL`      | web (Vite proxy)   | `http://127.0.0.1:3000`                    |
 | `ATTENDANCE_API_URL`    | web (Vite proxy)   | `http://127.0.0.1:3001`                    |
