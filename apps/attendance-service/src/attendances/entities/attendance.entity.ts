@@ -67,6 +67,14 @@ export class Attendance {
   })
   locationAccuracy!: number | null;
 
+  // What the employee plans to work on today
+  @Column({
+    type: 'varchar',
+    length: 500,
+    nullable: true,
+  })
+  note!: string | null;
+
   @CreateDateColumn({
     name: 'created_at',
     type: 'datetime',

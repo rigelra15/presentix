@@ -39,6 +39,7 @@ export class AttendancesService {
       longitude:
         attendance.longitude === null ? null : Number(attendance.longitude),
       locationAccuracy: attendance.locationAccuracy,
+      note: attendance.note,
       photoUrl: `/attendances/${attendance.id}/photo`,
     };
   }
@@ -116,6 +117,13 @@ export class AttendancesService {
     const longitude = this.parseNumber(body.longitude, 'Longitude', -180, 180);
     const accuracy = this.parseNumber(body.accuracy, 'Accuracy', 0, 100000);
 
+    // Today's agenda is required too
+    const note = (body.note ?? '').trim();
+
+    if (note.length < 3 || note.length > 500) {
+      throw new BadRequestException('Note must be 3 to 500 characters');
+    }
+
     if (!file?.buffer?.length) {
       throw new BadRequestException('Photo is required');
     }
@@ -182,6 +190,7 @@ export class AttendancesService {
         latitude: latitude.toFixed(6),
         longitude: longitude.toFixed(6),
         locationAccuracy: Math.round(accuracy),
+        note,
       });
 
       const saved = await this.attendances.save(attendance);
