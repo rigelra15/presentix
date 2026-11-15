@@ -1,4 +1,4 @@
-import { Controller, Get, Header, Param, ParseIntPipe, Post, Req, UploadedFile, UseGuards, UseInterceptors } from "@nestjs/common";
+import { Body, Controller, Get, Header, Param, ParseIntPipe, Post, Req, UploadedFile, UseGuards, UseInterceptors } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
 import { memoryStorage } from "multer";
 
@@ -20,16 +20,19 @@ export class AttendancesController {
       limits: {
         fileSize: 5 * 1024 * 1024,
         files: 1,
-        fields: 0,
-        parts: 1,
+        // latitude, longitude, accuracy
+        fields: 3,
+        fieldSize: 50,
+        parts: 4,
       },
     }),
   )
   create(
     @Req() request: AuthenticatedRequest,
+    @Body() body: Record<string, string>,
     @UploadedFile() file?: Express.Multer.File,
   ) {
-    return this.attendancesService.create(request.user, file);
+    return this.attendancesService.create(request.user, body, file);
   }
 
   @Get('me')

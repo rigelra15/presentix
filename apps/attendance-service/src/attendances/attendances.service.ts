@@ -34,8 +34,29 @@ export class AttendancesService {
       attendanceDate: attendance.attendanceDate,
       checkedInAt: attendance.checkedInAt,
       createdAt: attendance.createdAt,
+      latitude:
+        attendance.latitude === null ? null : Number(attendance.latitude),
+      longitude:
+        attendance.longitude === null ? null : Number(attendance.longitude),
+      locationAccuracy: attendance.locationAccuracy,
       photoUrl: `/attendances/${attendance.id}/photo`,
     };
+  }
+
+  // Read a number from a multipart form field and check its range.
+  private parseNumber(
+    value: string | undefined,
+    name: string,
+    min: number,
+    max: number,
+  ): number {
+    const number = Number(value);
+
+    if (!value || Number.isNaN(number) || number < min || number > max) {
+      throw new BadRequestException(`${name} is missing or invalid`);
+    }
+
+    return number;
   }
 
   private getWibDate(date: Date): string {
@@ -81,6 +102,7 @@ export class AttendancesService {
 
   async create(
     user: SessionUser,
+    body: Record<string, string>,
     file?: Express.Multer.File,
   ) {
     if (user.role !== 'EMPLOYEE' || !user.employeeId) {
@@ -88,6 +110,11 @@ export class AttendancesService {
         'Only employees can check in',
       );
     }
+
+    // GPS location is required for every new check-in
+    const latitude = this.parseNumber(body.latitude, 'Latitude', -90, 90);
+    const longitude = this.parseNumber(body.longitude, 'Longitude', -180, 180);
+    const accuracy = this.parseNumber(body.accuracy, 'Accuracy', 0, 100000);
 
     if (!file?.buffer?.length) {
       throw new BadRequestException('Photo is required');
@@ -152,6 +179,9 @@ export class AttendancesService {
         attendanceDate,
         checkedInAt: now,
         photoPath: filename,
+        latitude: latitude.toFixed(6),
+        longitude: longitude.toFixed(6),
+        locationAccuracy: Math.round(accuracy),
       });
 
       const saved = await this.attendances.save(attendance);

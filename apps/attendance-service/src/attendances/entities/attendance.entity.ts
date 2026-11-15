@@ -42,6 +42,31 @@ export class Attendance {
   })
   photoPath!: string;
 
+  // MySQL returns decimal values as strings, so the type is string here.
+  @Column({
+    type: 'decimal',
+    precision: 9,
+    scale: 6,
+    nullable: true,
+  })
+  latitude!: string | null;
+
+  @Column({
+    type: 'decimal',
+    precision: 9,
+    scale: 6,
+    nullable: true,
+  })
+  longitude!: string | null;
+
+  // GPS accuracy radius in meters, reported by the browser
+  @Column({
+    name: 'location_accuracy',
+    type: 'int',
+    nullable: true,
+  })
+  locationAccuracy!: number | null;
+
   @CreateDateColumn({
     name: 'created_at',
     type: 'datetime',
