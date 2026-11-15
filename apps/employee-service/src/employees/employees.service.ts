@@ -29,6 +29,8 @@ export class EmployeesService {
       department: employee.department,
       isActive: employee.isActive,
       email: employee.user.email,
+      // Account creation time = the employee's first day in the system
+      createdAt: employee.user.createdAt,
     };
   }
 

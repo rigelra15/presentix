@@ -18,6 +18,9 @@ export interface AuthenticatedUser {
   email: string;
   role: UserRole;
   employeeId?: number;
+  // When the account was created. The attendance calendar
+  // does not count days before this as absent.
+  createdAt: Date;
 }
 
 @Injectable()
@@ -89,6 +92,7 @@ export class JwtAuthGuard implements CanActivate {
       email: user.email,
       role: user.role,
       employeeId,
+      createdAt: user.createdAt,
     };
 
     return true;
