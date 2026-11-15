@@ -1,0 +1,86 @@
+import {
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { JwtService } from '@nestjs/jwt';
+import { Repository } from 'typeorm';
+import * as argon2 from 'argon2';
+
+import { User } from '../users/entities/user.entity.js';
+import { UserRole } from '../users/user-role.enum.js';
+import { Employee } from '../employees/entities/employee.entity.js';
+import type { LoginDto } from './dto/login.dto.js';
+
+@Injectable()
+export class AuthService {
+  constructor(
+    @InjectRepository(User)
+    private readonly users: Repository<User>,
+
+    @InjectRepository(Employee)
+    private readonly employees: Repository<Employee>,
+
+    private readonly jwtService: JwtService,
+  ) { }
+
+  async login(dto: LoginDto) {
+    const email = dto.email.trim().toLowerCase();
+
+    const user = await this.users.findOne({
+      where: { email },
+      select: {
+        id: true,
+        email: true,
+        passwordHash: true,
+        role: true,
+      },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException(
+        'Incorrect email or password',
+      );
+    }
+
+    const validPassword = await argon2
+      .verify(user.passwordHash, dto.password)
+      .catch(() => false);
+
+    if (!validPassword) {
+      throw new UnauthorizedException(
+        'Incorrect email or password',
+      )
+    }
+
+    if (user.role === UserRole.EMPLOYEE) {
+      const employee = await this.employees.findOne({
+        where: {
+          user: { id: user.id },
+        }
+      });
+
+      if (!employee || !employee.isActive) {
+        throw new UnauthorizedException(
+          'The account cannot be used'
+        );
+      }
+    }
+
+    const accessToken = await this.jwtService.signAsync({
+      sub: user.id,
+      role: user.role,
+    });
+
+    return {
+      access_token: accessToken,
+      token_type: 'Bearer',
+      expired_in: 1800,
+      user: {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+      }
+    }
+  }
+}
