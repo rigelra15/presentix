@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { CalendarDays, Clock, ListChecks, MapPin } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { CalendarDays, ChevronRight, Clock, ListChecks } from 'lucide-react'
 import { api, type Attendance } from '../../lib/api'
 import { useSession } from '../../lib/auth-context'
 import { formatDate, formatTime, getWibToday } from '../../lib/format'
@@ -49,37 +50,37 @@ export default function HistoryPage() {
             {records.length === 0 ? (
               <EmptyState message="You have not checked in yet." />
             ) : (
-              <table className="table">
+              <table className="table table-clickable">
                 <thead>
                   <tr>
                     <th>Date</th>
                     <th>Check-in time</th>
-                    <th>Location</th>
+                    <th>Agenda</th>
                     <th>Status</th>
+                    <th></th>
                   </tr>
                 </thead>
                 <tbody>
                   {records.map(record => (
                     <tr key={record.id}>
-                      <td>{formatDate(record.attendanceDate)}</td>
+                      <td>
+                        <Link to={`/history/${record.id}`} className="row-link">
+                          <strong>{formatDate(record.attendanceDate)}</strong>
+                        </Link>
+                      </td>
                       <td>{formatTime(record.checkedInAt)}</td>
                       <td>
-                        {record.latitude !== null && record.longitude !== null ? (
-                          <a
-                            className="link-inline"
-                            href={`https://www.google.com/maps?q=${record.latitude},${record.longitude}`}
-                            target="_blank"
-                            rel="noreferrer"
-                          >
-                            <MapPin size={14} />
-                            View on map
-                          </a>
-                        ) : (
-                          <span className="muted">Not recorded</span>
-                        )}
+                        <span className="note-preview" title={record.note ?? undefined}>
+                          {record.note || '-'}
+                        </span>
                       </td>
                       <td>
                         <span className="badge badge-success">Present</span>
+                      </td>
+                      <td className="cell-right">
+                        <Link to={`/history/${record.id}`} className="icon-link" aria-label="View details">
+                          <ChevronRight size={18} />
+                        </Link>
                       </td>
                     </tr>
                   ))}

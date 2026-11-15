@@ -32,6 +32,7 @@ export default function App() {
         <Route element={<Layout />}>
           <Route path="/check-in" element={<CheckInPage />} />
           <Route path="/history" element={<HistoryPage />} />
+          <Route path="/history/:id" element={<AttendanceDetailPage />} />
         </Route>
       </Route>
 

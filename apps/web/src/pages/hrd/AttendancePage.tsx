@@ -121,6 +121,7 @@ export default function AttendancePage() {
                   <th>Department</th>
                   <th>Date</th>
                   <th>Time</th>
+                  <th>Agenda</th>
                   <th>Location</th>
                   <th></th>
                 </tr>
@@ -140,6 +141,11 @@ export default function AttendancePage() {
                       <td>{employee?.department ?? '-'}</td>
                       <td>{formatDate(record.attendanceDate)}</td>
                       <td>{formatTime(record.checkedInAt)}</td>
+                      <td>
+                        <span className="note-preview" title={record.note ?? undefined}>
+                          {record.note || '-'}
+                        </span>
+                      </td>
                       <td>
                         {record.latitude !== null ? (
                           <span className="badge badge-info">

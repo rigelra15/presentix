@@ -8,9 +8,13 @@ import { Alert, Loading, PageHeader, StatusBadge } from '../../components/ui'
 import LocationMap from '../../components/LazyLocationMap'
 import ProtectedPhoto from '../../components/ProtectedPhoto'
 
+// Used by HRD (/hrd/attendance/:id) and by employees for their own
+// check-ins (/history/:id). The API only returns an employee's own records.
 export default function AttendanceDetailPage() {
-  const { token } = useSession()
+  const { token, user } = useSession()
   const { id } = useParams()
+  const isHrd = user.role === 'HRD'
+  const backTo = isHrd ? '/hrd/attendance' : '/history'
 
   const [record, setRecord] = useState<Attendance | null>(null)
   const [employee, setEmployee] = useState<Employee | null>(null)
@@ -23,12 +27,14 @@ export default function AttendanceDetailPage() {
         const attendance = await api<Attendance>(`/api/attendance/attendances/${id}`, { token })
         setRecord(attendance)
 
-        // The employee may have been removed from the list, so this one can fail quietly
-        const owner = await api<Employee>(
-          `/api/employee/employees/${attendance.employeeId}`,
-          { token }
-        ).catch(() => null)
-        setEmployee(owner)
+        // Only HRD can read employee data. This one can fail quietly.
+        if (isHrd) {
+          const owner = await api<Employee>(
+            `/api/employee/employees/${attendance.employeeId}`,
+            { token }
+          ).catch(() => null)
+          setEmployee(owner)
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load attendance')
       } finally {
@@ -37,7 +43,7 @@ export default function AttendanceDetailPage() {
     }
 
     void load()
-  }, [id, token])
+  }, [id, token, isHrd])
 
   if (loading) {
     return <Loading />
@@ -45,9 +51,9 @@ export default function AttendanceDetailPage() {
 
   return (
     <>
-      <Link to="/hrd/attendance" className="back-link">
+      <Link to={backTo} className="back-link">
         <ArrowLeft size={16} />
-        Back to attendance
+        {isHrd ? 'Back to attendance' : 'Back to my history'}
       </Link>
 
       {error || !record ? (
@@ -55,7 +61,7 @@ export default function AttendanceDetailPage() {
       ) : (
         <>
           <PageHeader
-            title={employee?.fullName ?? `Employee #${record.employeeId}`}
+            title={isHrd ? (employee?.fullName ?? `Employee #${record.employeeId}`) : 'My check-in'}
             description={`Check-in on ${formatDate(record.attendanceDate)}`}
           />
 
@@ -69,19 +75,30 @@ export default function AttendanceDetailPage() {
               <section className="card">
                 <h3 className="card-title">Check-in info</h3>
                 <dl className="info-list">
-                  <dt>Employee</dt>
-                  <dd>{employee?.fullName ?? '-'}</dd>
-                  <dt>Employee code</dt>
-                  <dd>{employee?.employeeCode ?? '-'}</dd>
-                  <dt>Department</dt>
-                  <dd>{employee?.department ?? '-'}</dd>
-                  <dt>Status</dt>
-                  <dd>{employee ? <StatusBadge active={employee.isActive} /> : '-'}</dd>
+                  {isHrd && (
+                    <>
+                      <dt>Employee</dt>
+                      <dd>{employee?.fullName ?? '-'}</dd>
+                      <dt>Employee code</dt>
+                      <dd>{employee?.employeeCode ?? '-'}</dd>
+                      <dt>Department</dt>
+                      <dd>{employee?.department ?? '-'}</dd>
+                      <dt>Status</dt>
+                      <dd>{employee ? <StatusBadge active={employee.isActive} /> : '-'}</dd>
+                    </>
+                  )}
                   <dt>Date</dt>
                   <dd>{formatDate(record.attendanceDate)}</dd>
                   <dt>Check-in time</dt>
                   <dd>{formatTime(record.checkedInAt)}</dd>
                 </dl>
+              </section>
+
+              <section className="card">
+                <h3 className="card-title">Agenda</h3>
+                <p className="note-text">
+                  {record.note || <span className="muted">No agenda (check-in made before notes were added).</span>}
+                </p>
               </section>
 
               <section className="card">

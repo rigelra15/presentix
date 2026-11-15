@@ -87,6 +87,7 @@ export default function OverviewPage() {
                 <tr>
                   <th>Employee</th>
                   <th>Time</th>
+                  <th>Agenda</th>
                   <th></th>
                 </tr>
               </thead>
@@ -95,6 +96,11 @@ export default function OverviewPage() {
                   <tr key={record.id}>
                     <td>{employeeName(record.employeeId)}</td>
                     <td>{formatTime(record.checkedInAt)}</td>
+                    <td>
+                      <span className="note-preview" title={record.note ?? undefined}>
+                        {record.note || '-'}
+                      </span>
+                    </td>
                     <td className="cell-right">
                       <Link to={`/hrd/attendance/${record.id}`} className="link-inline">
                         Details

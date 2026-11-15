@@ -12,6 +12,11 @@ import { formatDate, formatTime, getWibToday } from '../../lib/format'
 import { Alert, Loading, PageHeader } from '../../components/ui'
 import CameraCapture from '../../components/CameraCapture'
 import LocationMap from '../../components/LazyLocationMap'
+import ProtectedPhoto from '../../components/ProtectedPhoto'
+
+// Same limits as the API
+const NOTE_MIN = 3
+const NOTE_MAX = 500
 
 function locationErrorMessage(error: GeolocationPositionError): string {
   if (error.code === error.PERMISSION_DENIED) {
@@ -39,6 +44,7 @@ export default function CheckInPage() {
   const [locationError, setLocationError] = useState('')
 
   const [photo, setPhoto] = useState<Blob | null>(null)
+  const [note, setNote] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
 
@@ -80,14 +86,16 @@ export default function CheckInPage() {
     )
   }
 
+  const noteReady = note.trim().length >= NOTE_MIN
+
   async function handleSubmit() {
-    if (!photo || !location || submitting) return
+    if (!photo || !location || !noteReady || submitting) return
 
     setSubmitting(true)
     setSubmitError('')
 
     try {
-      const record = await submitCheckIn(token, photo, location)
+      const record = await submitCheckIn(token, photo, location, note.trim())
       setTodayRecord(record)
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : 'Check-in failed')
@@ -126,16 +134,30 @@ export default function CheckInPage() {
           </div>
         </div>
 
-        {todayRecord.latitude !== null && todayRecord.longitude !== null && (
-          <div className="card">
-            <h3 className="card-title">Check-in location</h3>
-            <LocationMap
-              latitude={todayRecord.latitude}
-              longitude={todayRecord.longitude}
-              accuracy={todayRecord.locationAccuracy}
-            />
+        <div className="detail-grid">
+          <section className="card">
+            <h3 className="card-title">My photo</h3>
+            <ProtectedPhoto key={todayRecord.id} token={token} attendanceId={todayRecord.id} />
+          </section>
+
+          <div className="detail-side">
+            <section className="card">
+              <h3 className="card-title">Today's agenda</h3>
+              <p className="note-text">{todayRecord.note || 'No agenda written.'}</p>
+            </section>
+
+            {todayRecord.latitude !== null && todayRecord.longitude !== null && (
+              <section className="card">
+                <h3 className="card-title">Check-in location</h3>
+                <LocationMap
+                  latitude={todayRecord.latitude}
+                  longitude={todayRecord.longitude}
+                  accuracy={todayRecord.locationAccuracy}
+                />
+              </section>
+            )}
           </div>
-        )}
+        </div>
 
         <Link to="/history" className="btn btn-secondary">
           View my attendance history
@@ -211,6 +233,31 @@ export default function CheckInPage() {
         </section>
       </div>
 
+      <section className="card step-card">
+        <div className="step-head">
+          <span className={`step-number ${noteReady ? 'done' : ''}`}>3</span>
+          <div>
+            <h3>Today's agenda</h3>
+            <p>Write what you will work on today. HRD can read this note.</p>
+          </div>
+        </div>
+
+        <label className="field">
+          <textarea
+            value={note}
+            onChange={e => setNote(e.target.value)}
+            maxLength={NOTE_MAX}
+            aria-label="Today's agenda"
+            rows={3}
+            placeholder="e.g. Finish the monthly report, team meeting at 10:00, review pull requests"
+            disabled={submitting}
+          />
+          <small className="note-counter">
+            {note.length}/{NOTE_MAX}
+          </small>
+        </label>
+      </section>
+
       {submitError && <Alert type="error">{submitError}</Alert>}
 
       <div className="submit-bar">
@@ -219,13 +266,15 @@ export default function CheckInPage() {
             ? 'Step 1: get your location.'
             : !photo
               ? 'Step 2: take your photo.'
-              : 'Ready to submit.'}
+              : !noteReady
+                ? "Step 3: write today's agenda."
+                : 'Ready to submit.'}
         </span>
         <button
           type="button"
           className="btn btn-primary btn-lg"
           onClick={handleSubmit}
-          disabled={!location || !photo || submitting}
+          disabled={!location || !photo || !noteReady || submitting}
         >
           <Send size={18} />
           {submitting ? 'Submitting...' : 'Submit check-in'}

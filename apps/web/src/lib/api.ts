@@ -32,6 +32,8 @@ export interface Attendance {
   latitude: number | null
   longitude: number | null
   locationAccuracy: number | null
+  // Today's agenda. Empty for check-ins made before notes were added.
+  note: string | null
 }
 
 export interface CheckInLocation {
@@ -118,13 +120,15 @@ export async function api<T>(
 export async function submitCheckIn(
   token: string,
   photo: Blob,
-  location: CheckInLocation
+  location: CheckInLocation,
+  note: string
 ): Promise<Attendance> {
   // Text fields first, then the photo
   const formData = new FormData()
   formData.append('latitude', String(location.latitude))
   formData.append('longitude', String(location.longitude))
   formData.append('accuracy', String(Math.round(location.accuracy)))
+  formData.append('note', note)
   formData.append('photo', photo, 'checkin.jpg')
 
   const response = await fetch('/api/attendance/attendances', {
