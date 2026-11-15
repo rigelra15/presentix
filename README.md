@@ -114,8 +114,10 @@ npm run check:login
 - WFH check-in in 3 steps:
   1. **GPS location** from the browser (required, the API rejects a check-in
      without valid coordinates)
-  2. **Live photo** taken with the device camera. There is no file picker, so
-     an old photo from the gallery cannot be uploaded
+  2. **Live photo** taken with the device camera. Only if the camera cannot
+     be used (no camera, permission denied, old browser) the employee can
+     upload a JPEG/PNG file instead. HRD sees which way was used
+     ("Live camera" or "Uploaded file")
   3. **Today's agenda**: a short note (3–500 characters) about what the
      employee works on today. HRD can read it
 - Date and time are taken from the server, not from the browser
@@ -166,7 +168,7 @@ user is sent back to the login page.
 - Browsers only allow camera and GPS on `https://` or `http://localhost`.
   To try it on a phone in the same network, the web app must be served over
   HTTPS (opening `http://<laptop-ip>:5173` will block the camera).
-- Camera-only photos and GPS make cheating harder for normal users, but a
+- Live photos and GPS make cheating harder for normal users, but a
   determined user could still use a virtual camera or a fake GPS app. The
   server records its own time and stores the GPS accuracy so HRD can spot
   unusual check-ins. Stronger checks (e.g. office geofencing, face matching)
@@ -250,6 +252,7 @@ All endpoints except login need `Authorization: Bearer <token>`.
 | `longitude` | number, -180 to 180                |
 | `accuracy`  | number in meters, from the browser |
 | `note`      | text, 3 to 500 characters          |
+| `photoSource` | `CAMERA` or `UPLOAD` (label set by the browser) |
 | `photo`     | JPEG or PNG, max 5 MB              |
 
 ## Database
@@ -261,10 +264,10 @@ All endpoints except login need `Authorization: Bearer <token>`.
 
 **attendance_db**
 - `attendances` – id, employee_id, attendance_date, checked_in_at, photo_path,
-  latitude, longitude, location_accuracy, note, created_at.
+  photo_source, latitude, longitude, location_accuracy, note, created_at.
   Unique index on (employee_id, attendance_date).
-  The location and note columns were added by later migrations and are empty
-  for check-ins made before them.
+  The location, note and photo_source columns were added by later migrations
+  and are empty for check-ins made before them.
 
 `employee_id` has no foreign key because it lives in another service's
 database. Photos are saved on disk in `storage/attendance-photos/` (git-ignored),
