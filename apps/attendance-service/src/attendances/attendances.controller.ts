@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Header, Param, ParseIntPipe, Post, Req, UploadedFile, UseGuards, UseInterceptors } from "@nestjs/common";
+import { Body, Controller, Get, Header, Param, ParseIntPipe, Post, Query, Req, UploadedFile, UseGuards, UseInterceptors } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
 import { memoryStorage } from "multer";
 
@@ -42,8 +42,12 @@ export class AttendancesController {
   }
 
   @Get()
-  findAll(@Req() request: AuthenticatedRequest) {
-    return this.attendancesService.findAll(request.user);
+  findAll(
+    @Req() request: AuthenticatedRequest,
+    // Optional filter, e.g. /attendances?employeeId=5
+    @Query('employeeId') employeeId?: string,
+  ) {
+    return this.attendancesService.findAll(request.user, employeeId);
   }
 
   @Get(':id/photo')

@@ -226,12 +226,26 @@ export class AttendancesService {
     return rows.map((row) => this.toResponse(row));
   }
 
-  async findAll(user: SessionUser) {
+  async findAll(user: SessionUser, employeeId?: string) {
     if (user.role !== 'HRD') {
       throw new ForbiddenException();
     }
 
+    // Without the filter, all attendance is returned
+    let where = {};
+
+    if (employeeId !== undefined) {
+      const id = Number(employeeId);
+
+      if (!Number.isInteger(id) || id < 1) {
+        throw new BadRequestException('employeeId is invalid');
+      }
+
+      where = { employeeId: id };
+    }
+
     const rows = await this.attendances.find({
+      where,
       order: { checkedInAt: 'DESC' },
     });
 
