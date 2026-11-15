@@ -134,6 +134,15 @@ code {
   background: var(--danger-soft);
 }
 
+.btn-danger {
+  background: var(--danger);
+  color: #fff;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: #b91c1c;
+}
+
 .btn-sm {
   padding: 6px 10px;
   font-size: 13px;
@@ -824,17 +833,29 @@ input:focus, select:focus, textarea:focus {
 /* =========================================================
    Employee form
    ========================================================= */
-.form-card {
+.form-layout {
   display: grid;
-  gap: 18px;
-  max-width: 760px;
+  gap: 16px;
+}
+
+/* Each form section: title + hint on the left, fields on the right */
+.form-section-card {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: 24px;
   padding: 24px;
 }
 
-.form-section {
-  padding-bottom: 8px;
-  border-bottom: 1px solid var(--border);
-  font-size: 14px;
+.form-section-head h3 {
+  margin: 0 0 4px;
+  font-size: 15px;
+}
+
+.form-section-head p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.5;
 }
 
 .form-grid {
@@ -843,11 +864,145 @@ input:focus, select:focus, textarea:focus {
   gap: 16px;
 }
 
+.field-full {
+  grid-column: 1 / -1;
+}
+
+/* Password input with the show/hide button inside it */
+.password-input {
+  position: relative;
+  display: flex;
+}
+
+.password-input input {
+  flex: 1;
+  padding-right: 44px;
+}
+
+.password-input .btn-icon {
+  position: absolute;
+  top: 50%;
+  right: 4px;
+  transform: translateY(-50%);
+}
+
 .form-actions {
   display: flex;
   justify-content: flex-end;
   gap: 10px;
-  padding-top: 8px;
+}
+
+.btn-danger-outline {
+  border-color: #f5c2c2;
+  background: var(--surface);
+  color: var(--danger);
+}
+
+.btn-danger-outline:hover:not(:disabled) {
+  background: var(--danger-soft);
+}
+
+.danger-zone {
+  margin-top: 8px;
+}
+
+.danger-actions {
+  display: grid;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.danger-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+}
+
+.danger-row + .danger-row {
+  border-top: 1px solid var(--border);
+}
+
+.danger-row strong {
+  font-size: 14px;
+}
+
+.danger-row p {
+  margin: 2px 0 0;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.danger-row .btn {
+  flex-shrink: 0;
+}
+
+/* =========================================================
+   Confirmation modal (native <dialog>)
+   ========================================================= */
+.modal {
+  width: min(440px, calc(100% - 32px));
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.25);
+}
+
+.modal::backdrop {
+  background: rgba(15, 23, 42, 0.5);
+}
+
+.modal-content {
+  display: grid;
+  gap: 16px;
+  padding: 24px;
+}
+
+.modal-icon {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.modal-icon-danger {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.modal-text h2 {
+  margin: 0 0 6px;
+  font-size: 18px;
+}
+
+.modal-message {
+  color: var(--text-muted);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.modal-message p {
+  margin: 0 0 8px;
+}
+
+.modal-message p:last-child {
+  margin-bottom: 0;
+}
+
+.modal-message strong {
+  color: var(--text);
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
 }
 
 /* =========================================================
@@ -1191,6 +1346,11 @@ input:focus, select:focus, textarea:focus {
 }
 
 @media (max-width: 900px) {
+  .form-section-card {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
   .login-page {
     grid-template-columns: 1fr;
   }
@@ -1247,6 +1407,11 @@ input:focus, select:focus, textarea:focus {
   .stats-grid,
   .form-grid {
     grid-template-columns: 1fr;
+  }
+
+  .danger-row {
+    flex-direction: column;
+    align-items: stretch;
   }
 
   .submit-bar .btn {

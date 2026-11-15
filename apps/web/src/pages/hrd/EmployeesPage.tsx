@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { Pencil, Plus, Search, UserCheck, UserX } from 'lucide-react'
+import { Pencil, Plus, Search, Trash2, UserCheck, UserX } from 'lucide-react'
 import { api, type Employee } from '../../lib/api'
 import { useSession } from '../../lib/auth-context'
 import { Alert, EmptyState, Loading, PageHeader, StatusBadge } from '../../components/ui'
+import EmployeeActionDialog, { type EmployeeAction } from '../../components/EmployeeActionDialog'
 
 type StatusFilter = 'all' | 'active' | 'inactive'
 
@@ -15,7 +16,8 @@ export default function EmployeesPage() {
 
   const [employees, setEmployees] = useState<Employee[]>([])
   const [loading, setLoading] = useState(true)
-  const [busyId, setBusyId] = useState<number | null>(null)
+  // Which action the confirmation modal is asking about
+  const [pending, setPending] = useState<{ action: EmployeeAction; employee: Employee } | null>(null)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState(savedMessage ?? '')
 
@@ -29,38 +31,25 @@ export default function EmployeesPage() {
       .finally(() => setLoading(false))
   }, [token])
 
-  async function toggleStatus(employee: Employee) {
-    if (employee.isActive) {
-      const ok = window.confirm(
-        `Deactivate ${employee.fullName}? This employee will no longer be able to log in.`
-      )
-      if (!ok) return
-    }
-
-    setBusyId(employee.id)
-    setError('')
+  function openDialog(action: EmployeeAction, employee: Employee) {
     setNotice('')
+    setError('')
+    setPending({ action, employee })
+  }
 
-    try {
-      // DELETE deactivates, PATCH isActive=true reactivates
-      const updated = employee.isActive
-        ? await api<Employee>(`/api/employee/employees/${employee.id}`, {
-            token,
-            method: 'DELETE'
-          })
-        : await api<Employee>(`/api/employee/employees/${employee.id}`, {
-            token,
-            method: 'PATCH',
-            body: { isActive: true }
-          })
+  // Called by the modal after the API call succeeded
+  function handleDone(updated: Employee | null, message: string) {
+    const id = pending?.employee.id
 
+    if (updated) {
       setEmployees(list => list.map(e => (e.id === updated.id ? updated : e)))
-      setNotice(`${updated.fullName} has been ${updated.isActive ? 'reactivated' : 'deactivated'}.`)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to change status')
-    } finally {
-      setBusyId(null)
+    } else {
+      // Deleted: remove the row
+      setEmployees(list => list.filter(e => e.id !== id))
     }
+
+    setNotice(message)
+    setPending(null)
   }
 
   const query = search.trim().toLowerCase()
@@ -156,16 +145,39 @@ export default function EmployeesPage() {
                       >
                         <Pencil size={16} />
                       </Link>
-                      <button
-                        type="button"
-                        className={`btn btn-icon ${employee.isActive ? 'btn-danger-ghost' : 'btn-ghost'}`}
-                        onClick={() => toggleStatus(employee)}
-                        disabled={busyId === employee.id}
-                        title={employee.isActive ? 'Deactivate' : 'Reactivate'}
-                        aria-label={`${employee.isActive ? 'Deactivate' : 'Reactivate'} ${employee.fullName}`}
-                      >
-                        {employee.isActive ? <UserX size={16} /> : <UserCheck size={16} />}
-                      </button>
+                      {employee.isActive ? (
+                        <button
+                          type="button"
+                          className="btn btn-icon btn-danger-ghost"
+                          onClick={() => openDialog('deactivate', employee)}
+                          title="Deactivate"
+                          aria-label={`Deactivate ${employee.fullName}`}
+                        >
+                          <UserX size={16} />
+                        </button>
+                      ) : (
+                        <>
+                          <button
+                            type="button"
+                            className="btn btn-icon btn-ghost"
+                            onClick={() => openDialog('reactivate', employee)}
+                            title="Reactivate"
+                            aria-label={`Reactivate ${employee.fullName}`}
+                          >
+                            <UserCheck size={16} />
+                          </button>
+                          {/* Permanent delete is only offered for inactive employees */}
+                          <button
+                            type="button"
+                            className="btn btn-icon btn-danger-ghost"
+                            onClick={() => openDialog('delete', employee)}
+                            title="Delete permanently"
+                            aria-label={`Delete ${employee.fullName} permanently`}
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -174,6 +186,18 @@ export default function EmployeesPage() {
           </table>
         )}
       </div>
+
+      {pending && (
+        <EmployeeActionDialog
+          // A new key gives every dialog a fresh state
+          key={`${pending.action}-${pending.employee.id}`}
+          token={token}
+          action={pending.action}
+          employee={pending.employee}
+          onClose={() => setPending(null)}
+          onDone={handleDone}
+        />
+      )}
     </>
   )
 }
