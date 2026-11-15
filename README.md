@@ -228,7 +228,7 @@ or `503` when the database cannot be reached.
 
 | Method | Path             | Role | Description                    |
 | ------ | ---------------- | ---- | ------------------------------ |
-| POST   | `/auth/login`    | –    | Login, returns JWT (30 min)    |
+| POST   | `/auth/login`    | –    | Login, returns JWT (30 min). Max 5 tries per minute |
 | GET    | `/auth/me`       | any  | Current user                   |
 | GET    | `/employees`     | HRD  | List employees                 |
 | GET    | `/employees/next-code` | HRD | Next free code, e.g. `EMP-0002` |
@@ -312,6 +312,11 @@ Defaults work for local development. These environment variables can override th
 ## Security notes
 
 - Passwords are hashed with Argon2id. The hash column is never returned by the API.
+- Login allows 5 attempts per minute for the same email from the same IP address,
+  then answers `429 Too Many Requests`. This slows down password guessing.
+- A wrong email and a wrong password get the same error, and take about the same
+  time (an unknown email is still checked against a dummy hash), so the login
+  does not reveal which emails exist.
 - Secrets are read from files in `docker/secrets/`, not hard-coded or committed.
 - MySQL is only exposed on `127.0.0.1`.
 - Each service uses its own DB user that only has access to its own database.
