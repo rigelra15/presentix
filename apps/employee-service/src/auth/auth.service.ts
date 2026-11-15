@@ -6,11 +6,17 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { JwtService } from '@nestjs/jwt';
 import { Repository } from 'typeorm';
 import * as argon2 from 'argon2';
+import { randomUUID } from 'node:crypto';
 
 import { User } from '../users/entities/user.entity.js';
 import { UserRole } from '../users/user-role.enum.js';
 import { Employee } from '../employees/entities/employee.entity.js';
 import type { LoginDto } from './dto/login.dto.js';
+
+// A hash of a random password. When the email does not exist we still
+// verify against this hash, so the answer takes about as long as for a
+// wrong password. Otherwise the response time shows which emails exist.
+const dummyHash = argon2.hash(randomUUID(), { type: argon2.argon2id });
 
 @Injectable()
 export class AuthService {
@@ -38,6 +44,8 @@ export class AuthService {
     });
 
     if (!user) {
+      await argon2.verify(await dummyHash, dto.password).catch(() => false);
+
       throw new UnauthorizedException(
         'Incorrect email or password',
       );

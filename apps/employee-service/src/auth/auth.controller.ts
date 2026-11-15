@@ -1,5 +1,7 @@
 import { Body, Controller, HttpCode, HttpStatus, Post, Get, Req, UseGuards } from '@nestjs/common';
 
+import { ThrottlerGuard } from '@nestjs/throttler';
+
 import { AuthService } from './auth.service.js';
 import { LoginDto } from './dto/login.dto.js';
 
@@ -14,6 +16,8 @@ export class AuthController {
 
   @Post('login')
   @HttpCode(HttpStatus.OK)
+  // Max 5 attempts per minute, then 429 Too Many Requests
+  @UseGuards(ThrottlerGuard)
   login(@Body() dto: LoginDto) {
     return this.authService.login(dto);
   }
