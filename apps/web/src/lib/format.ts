@@ -47,3 +47,10 @@ export function formatTime(value: string): string {
 export function formatCoordinates(latitude: number, longitude: number): string {
   return `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`
 }
+
+// ISO timestamp -> WIB date "YYYY-MM-DD"
+export function toWibDate(value: string): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: TIME_ZONE }).format(
+    new Date(value)
+  )
+}

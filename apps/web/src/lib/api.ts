@@ -5,6 +5,8 @@ export interface SessionUser {
   email: string
   role: Role
   employeeId?: number
+  // Missing in sessions saved before this field was added
+  createdAt?: string
 }
 
 export interface LoginResponse {
@@ -21,6 +23,7 @@ export interface Employee {
   department: string
   email: string
   isActive: boolean
+  createdAt: string
 }
 
 export interface Attendance {

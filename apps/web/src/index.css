@@ -22,6 +22,8 @@
   --success-soft: #e8f6ec;
   --danger: #dc2626;
   --danger-soft: #fdecec;
+  --warning: #b45309;
+  --warning-soft: #fdf3e2;
   --info: #1d4ed8;
   --info-soft: #e8effd;
 
@@ -580,6 +582,16 @@ input:focus, select:focus, textarea:focus {
   color: var(--info);
 }
 
+.badge-danger {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.badge-warning {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+
 .loading {
   display: flex;
   align-items: center;
@@ -937,6 +949,188 @@ input:focus, select:focus, textarea:focus {
 .danger-row .btn {
   flex-shrink: 0;
 }
+
+/* =========================================================
+   Attendance calendar
+   ========================================================= */
+.calendar-body {
+  padding: 20px;
+}
+
+/* Two-button switch, e.g. List / Calendar */
+.segmented {
+  display: inline-flex;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+
+.segmented button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.segmented button.active {
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.calendar {
+  display: grid;
+  gap: 16px;
+}
+
+.calendar-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.calendar-nav {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.calendar-nav h3 {
+  min-width: 150px;
+  margin: 0;
+  font-size: 16px;
+  text-align: center;
+}
+
+.calendar-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.calendar-weekday {
+  padding: 4px 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.calendar-day {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 4px;
+  min-height: 72px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+}
+
+button.calendar-day {
+  cursor: pointer;
+}
+
+button.calendar-day:hover {
+  box-shadow: 0 0 0 2px var(--primary-soft);
+}
+
+.calendar-date {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.calendar-text {
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Colors per status. Also used by the legend dots. */
+.day-present {
+  border-color: #bbe5c8;
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.day-partial {
+  border-color: #f3d9a8;
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+
+.day-absent {
+  border-color: #f5c2c2;
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.day-off {
+  background: #f1f4f8;
+  color: var(--text-muted);
+}
+
+.day-future,
+.day-none {
+  color: var(--text-muted);
+}
+
+.day-none {
+  border-style: dashed;
+}
+
+.calendar-day.is-today {
+  outline: 2px solid var(--primary);
+  outline-offset: 1px;
+}
+
+.calendar-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.calendar-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legend-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+}
+
+/* Stronger colors than the cells, so the small dots are easy to see */
+.legend-dot.day-present { background: #4ade80; }
+.legend-dot.day-partial { background: #fbbf24; }
+.legend-dot.day-absent { background: #f87171; }
+.legend-dot.day-off { background: #cbd5e1; }
 
 /* =========================================================
    Confirmation modal (native <dialog>)
@@ -1404,6 +1598,20 @@ input:focus, select:focus, textarea:focus {
 }
 
 @media (max-width: 640px) {
+  /* Small cells on phones: color only, no text */
+  .calendar-grid {
+    gap: 4px;
+  }
+
+  .calendar-day {
+    min-height: 44px;
+    padding: 6px;
+  }
+
+  .calendar-text {
+    display: none;
+  }
+
   .stats-grid,
   .form-grid {
     grid-template-columns: 1fr;

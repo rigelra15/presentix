@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ChevronRight, MapPin, Search } from 'lucide-react'
+import { CalendarDays, ChevronRight, List, MapPin, Search } from 'lucide-react'
 import { api, type Attendance, type Employee } from '../../lib/api'
 import { useSession } from '../../lib/auth-context'
 import { formatDate, formatTime, getWibToday } from '../../lib/format'
 import { Alert, EmptyState, Loading, PageHeader } from '../../components/ui'
+import TeamCalendar from '../../components/TeamCalendar'
 
 export default function AttendancePage() {
   const { token } = useSession()
@@ -17,6 +18,7 @@ export default function AttendancePage() {
   const [search, setSearch] = useState('')
   const [date, setDate] = useState('')
   const [department, setDepartment] = useState('')
+  const [view, setView] = useState<'list' | 'calendar'>('list')
 
   useEffect(() => {
     // Attendance only stores employeeId, so employee names
@@ -59,117 +61,159 @@ export default function AttendancePage() {
       <PageHeader
         title="Attendance"
         description="Check-ins submitted by employees (view only)."
+        actions={
+          <div className="segmented" role="group" aria-label="View">
+            <button
+              type="button"
+              className={view === 'list' ? 'active' : ''}
+              onClick={() => setView('list')}
+              aria-pressed={view === 'list'}
+            >
+              <List size={16} />
+              List
+            </button>
+            <button
+              type="button"
+              className={view === 'calendar' ? 'active' : ''}
+              onClick={() => setView('calendar')}
+              aria-pressed={view === 'calendar'}
+            >
+              <CalendarDays size={16} />
+              Calendar
+            </button>
+          </div>
+        }
       />
 
       {error && <Alert type="error">{error}</Alert>}
 
-      <div className="card table-card">
-        <div className="toolbar">
-          <div className="search-input">
-            <Search size={16} />
-            <input
-              type="search"
-              placeholder="Search name or employee code"
-              value={search}
-              onChange={event => setSearch(event.target.value)}
-            />
-          </div>
-
-          <select value={department} onChange={event => setDepartment(event.target.value)}>
-            <option value="">All departments</option>
-            {departments.map(name => (
-              <option key={name} value={name}>{name}</option>
-            ))}
-          </select>
-
-          <input
-            type="date"
-            value={date}
-            onChange={event => setDate(event.target.value)}
-            aria-label="Filter by date"
-          />
-
-          <button type="button" className="btn btn-ghost btn-sm" onClick={() => setDate(getWibToday())}>
-            Today
-          </button>
-
-          {(search || date || department) && (
-            <button
-              type="button"
-              className="btn btn-ghost btn-sm"
-              onClick={() => {
+      {view === 'calendar' ? (
+        <div className="card table-card">
+          {loading ? (
+            <Loading />
+          ) : (
+            <TeamCalendar
+              records={records}
+              employees={employees}
+              onOpenDay={day => {
+                // Show the list for that day
                 setSearch('')
-                setDate('')
                 setDepartment('')
+                setDate(day)
+                setView('list')
               }}
-            >
-              Clear filters
-            </button>
+            />
           )}
         </div>
+      ) : (
+        <div className="card table-card">
+          <div className="toolbar">
+            <div className="search-input">
+              <Search size={16} />
+              <input
+                type="search"
+                placeholder="Search name or employee code"
+                value={search}
+                onChange={event => setSearch(event.target.value)}
+              />
+            </div>
 
-        {loading ? (
-          <Loading />
-        ) : filtered.length === 0 ? (
-          <EmptyState message="No attendance records found." />
-        ) : (
-          <>
-            <table className="table table-clickable">
-              <thead>
-                <tr>
-                  <th>Employee</th>
-                  <th>Department</th>
-                  <th>Date</th>
-                  <th>Time</th>
-                  <th>Agenda</th>
-                  <th>Location</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map(record => {
-                  const employee = findEmployee(record.employeeId)
+            <select value={department} onChange={event => setDepartment(event.target.value)}>
+              <option value="">All departments</option>
+              {departments.map(name => (
+                <option key={name} value={name}>{name}</option>
+              ))}
+            </select>
 
-                  return (
-                    <tr key={record.id}>
-                      <td>
-                        <Link to={`/hrd/attendance/${record.id}`} className="row-link">
-                          <strong>{employee?.fullName ?? `Employee #${record.employeeId}`}</strong>
-                          <small>{employee?.employeeCode}</small>
-                        </Link>
-                      </td>
-                      <td>{employee?.department ?? '-'}</td>
-                      <td>{formatDate(record.attendanceDate)}</td>
-                      <td>{formatTime(record.checkedInAt)}</td>
-                      <td>
-                        <span className="note-preview" title={record.note ?? undefined}>
-                          {record.note || '-'}
-                        </span>
-                      </td>
-                      <td>
-                        {record.latitude !== null ? (
-                          <span className="badge badge-info">
-                            <MapPin size={12} />
-                            Recorded
+            <input
+              type="date"
+              value={date}
+              onChange={event => setDate(event.target.value)}
+              aria-label="Filter by date"
+            />
+
+            <button type="button" className="btn btn-ghost btn-sm" onClick={() => setDate(getWibToday())}>
+              Today
+            </button>
+
+            {(search || date || department) && (
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={() => {
+                  setSearch('')
+                  setDate('')
+                  setDepartment('')
+                }}
+              >
+                Clear filters
+              </button>
+            )}
+          </div>
+
+          {loading ? (
+            <Loading />
+          ) : filtered.length === 0 ? (
+            <EmptyState message="No attendance records found." />
+          ) : (
+            <>
+              <table className="table table-clickable">
+                <thead>
+                  <tr>
+                    <th>Employee</th>
+                    <th>Department</th>
+                    <th>Date</th>
+                    <th>Time</th>
+                    <th>Agenda</th>
+                    <th>Location</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map(record => {
+                    const employee = findEmployee(record.employeeId)
+
+                    return (
+                      <tr key={record.id}>
+                        <td>
+                          <Link to={`/hrd/attendance/${record.id}`} className="row-link">
+                            <strong>{employee?.fullName ?? `Employee #${record.employeeId}`}</strong>
+                            <small>{employee?.employeeCode}</small>
+                          </Link>
+                        </td>
+                        <td>{employee?.department ?? '-'}</td>
+                        <td>{formatDate(record.attendanceDate)}</td>
+                        <td>{formatTime(record.checkedInAt)}</td>
+                        <td>
+                          <span className="note-preview" title={record.note ?? undefined}>
+                            {record.note || '-'}
                           </span>
-                        ) : (
-                          <span className="badge badge-muted">No GPS</span>
-                        )}
-                      </td>
-                      <td className="cell-right">
-                        <Link to={`/hrd/attendance/${record.id}`} className="icon-link" aria-label="View details">
-                          <ChevronRight size={18} />
-                        </Link>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-            <p className="table-footer">{filtered.length} of {records.length} records</p>
-          </>
-        )}
-      </div>
+                        </td>
+                        <td>
+                          {record.latitude !== null ? (
+                            <span className="badge badge-info">
+                              <MapPin size={12} />
+                              Recorded
+                            </span>
+                          ) : (
+                            <span className="badge badge-muted">No GPS</span>
+                          )}
+                        </td>
+                        <td className="cell-right">
+                          <Link to={`/hrd/attendance/${record.id}`} className="icon-link" aria-label="View details">
+                            <ChevronRight size={18} />
+                          </Link>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+              <p className="table-footer">{filtered.length} of {records.length} records</p>
+            </>
+          )}
+        </div>
+      )}
     </>
   )
 }
