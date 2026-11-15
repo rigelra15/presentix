@@ -34,6 +34,23 @@ export default function EmployeeFormPage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
+  // When adding, fill in the next free employee code.
+  // HRD can still change it by hand.
+  useEffect(() => {
+    if (isEdit) return
+
+    api<{ employeeCode: string }>('/api/employee/employees/next-code', { token })
+      .then(result => {
+        // Do not overwrite a code HRD already typed
+        setForm(current =>
+          current.employeeCode ? current : { ...current, employeeCode: result.employeeCode }
+        )
+      })
+      .catch(() => {
+        // Not a problem: HRD can type the code manually
+      })
+  }, [isEdit, token])
+
   // When editing, load the current data into the form
   useEffect(() => {
     if (!isEdit) return
@@ -137,12 +154,13 @@ export default function EmployeeFormPage() {
             <input
               value={form.employeeCode}
               onChange={event => updateField('employeeCode', event.target.value)}
-              placeholder="EMP-001"
+              placeholder="EMP-0001"
               maxLength={30}
               pattern="[A-Za-z0-9_\-]+"
               title="Letters, numbers, - and _ only"
               required
             />
+            {!isEdit && <small>Filled in automatically. You can change it.</small>}
           </label>
 
           <label className="field">
