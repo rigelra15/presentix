@@ -26,6 +26,9 @@ export interface Employee {
   createdAt: string
 }
 
+// CAMERA = live camera photo, UPLOAD = file chosen because no camera was available
+export type PhotoSource = 'CAMERA' | 'UPLOAD'
+
 export interface Attendance {
   id: number
   employeeId: number
@@ -37,6 +40,8 @@ export interface Attendance {
   locationAccuracy: number | null
   // Today's agenda. Empty for check-ins made before notes were added.
   note: string | null
+  // Empty for check-ins made before this was recorded
+  photoSource: PhotoSource | null
 }
 
 export interface CheckInLocation {
@@ -123,6 +128,7 @@ export async function api<T>(
 export async function submitCheckIn(
   token: string,
   photo: Blob,
+  photoSource: PhotoSource,
   location: CheckInLocation,
   note: string
 ): Promise<Attendance> {
@@ -132,7 +138,8 @@ export async function submitCheckIn(
   formData.append('longitude', String(location.longitude))
   formData.append('accuracy', String(Math.round(location.accuracy)))
   formData.append('note', note)
-  formData.append('photo', photo, 'checkin.jpg')
+  formData.append('photoSource', photoSource)
+  formData.append('photo', photo, photo.type === 'image/png' ? 'checkin.png' : 'checkin.jpg')
 
   const response = await fetch('/api/attendance/attendances', {
     method: 'POST',

@@ -1,22 +1,33 @@
-import { useEffect, useRef, useState } from 'react'
-import { Camera, RefreshCw } from 'lucide-react'
+import { useEffect, useRef, useState, type ChangeEvent } from 'react'
+import { Camera, ImageUp, RefreshCw } from 'lucide-react'
+import type { PhotoSource } from '../lib/api'
 
 interface Props {
-  // Called with the JPEG photo, or null when the user retakes
-  onChange: (photo: Blob | null) => void
+  // Called with the photo and how it was taken, or null when it is removed
+  onChange: (photo: Blob | null, source: PhotoSource) => void
   disabled?: boolean
 }
 
+// Same limits as the API
+const MAX_UPLOAD_SIZE = 5 * 1024 * 1024
+const ALLOWED_TYPES = ['image/jpeg', 'image/png']
+
 // Takes a photo directly from the device camera.
-// There is no file picker, so the employee cannot upload an old photo.
+// Only when the camera cannot be used (no camera, permission denied,
+// old browser) the employee may upload a photo file instead.
+// HRD can see which way was used.
 export default function CameraCapture({ onChange, disabled }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [cameraOn, setCameraOn] = useState(false)
   const [starting, setStarting] = useState(false)
   const [error, setError] = useState('')
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [source, setSource] = useState<PhotoSource>('CAMERA')
+  // true after the camera failed, this shows the upload option
+  const [cameraUnavailable, setCameraUnavailable] = useState(false)
 
   function stopCamera() {
     streamRef.current?.getTracks().forEach(track => track.stop())
@@ -28,7 +39,8 @@ export default function CameraCapture({ onChange, disabled }: Props) {
     setError('')
 
     if (!navigator.mediaDevices?.getUserMedia) {
-      setError('This browser cannot access the camera. Use Chrome, Edge, Firefox or Safari.')
+      setError('This browser cannot access the camera.')
+      setCameraUnavailable(true)
       return
     }
 
@@ -56,6 +68,8 @@ export default function CameraCapture({ onChange, disabled }: Props) {
       } else {
         setError('Unable to start the camera. Close other apps that use it and try again.')
       }
+
+      setCameraUnavailable(true)
     } finally {
       setStarting(false)
     }
@@ -79,7 +93,8 @@ export default function CameraCapture({ onChange, disabled }: Props) {
         }
 
         setPreviewUrl(URL.createObjectURL(blob))
-        onChange(blob)
+        setSource('CAMERA')
+        onChange(blob, 'CAMERA')
         stopCamera()
       },
       'image/jpeg',
@@ -90,8 +105,39 @@ export default function CameraCapture({ onChange, disabled }: Props) {
   function retake() {
     if (previewUrl) URL.revokeObjectURL(previewUrl)
     setPreviewUrl(null)
-    onChange(null)
-    void startCamera()
+    onChange(null, source)
+
+    // Camera photo: open the camera again. Uploaded file: pick another file.
+    if (source === 'CAMERA') {
+      void startCamera()
+    } else {
+      fileInputRef.current?.click()
+    }
+  }
+
+  // Fallback: the employee picked a photo file
+  function handleFile(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    // Reset the input so the same file can be chosen again later
+    event.target.value = ''
+
+    if (!file) return
+
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      setError('Please choose a JPEG or PNG photo.')
+      return
+    }
+
+    if (file.size > MAX_UPLOAD_SIZE) {
+      setError('The photo is too large (max 5 MB).')
+      return
+    }
+
+    setError('')
+    if (previewUrl) URL.revokeObjectURL(previewUrl)
+    setPreviewUrl(URL.createObjectURL(file))
+    setSource('UPLOAD')
+    onChange(file, 'UPLOAD')
   }
 
   // The <video> element is only rendered after cameraOn is true,
@@ -120,7 +166,10 @@ export default function CameraCapture({ onChange, disabled }: Props) {
     <div className="camera">
       <div className="camera-frame">
         {previewUrl ? (
-          <img src={previewUrl} alt="Your check-in photo" />
+          <>
+            <img src={previewUrl} alt="Your check-in photo" />
+            {source === 'UPLOAD' && <span className="photo-source-tag">Uploaded file</span>}
+          </>
         ) : cameraOn ? (
           <video ref={videoRef} autoPlay playsInline muted className="mirror" />
         ) : (
@@ -133,11 +182,26 @@ export default function CameraCapture({ onChange, disabled }: Props) {
 
       {error && <p className="field-error">{error}</p>}
 
+      {cameraUnavailable && !previewUrl && (
+        <p className="muted upload-hint">
+          No camera? You can upload a photo instead. HRD will see that it was uploaded.
+        </p>
+      )}
+
+      {/* Hidden file input, opened by the "Upload photo" button */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/jpeg,image/png"
+        onChange={handleFile}
+        hidden
+      />
+
       <div className="step-actions">
         {previewUrl ? (
           <button type="button" className="btn btn-secondary" onClick={retake} disabled={disabled}>
             <RefreshCw size={16} />
-            Retake photo
+            {source === 'CAMERA' ? 'Retake photo' : 'Choose another photo'}
           </button>
         ) : cameraOn ? (
           <button type="button" className="btn btn-primary" onClick={takePhoto} disabled={disabled}>
@@ -145,15 +209,28 @@ export default function CameraCapture({ onChange, disabled }: Props) {
             Take photo
           </button>
         ) : (
-          <button
-            type="button"
-            className="btn btn-secondary"
-            onClick={startCamera}
-            disabled={disabled || starting}
-          >
-            <Camera size={16} />
-            {starting ? 'Starting camera...' : 'Open camera'}
-          </button>
+          <>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={startCamera}
+              disabled={disabled || starting}
+            >
+              <Camera size={16} />
+              {starting ? 'Starting camera...' : cameraUnavailable ? 'Try camera again' : 'Open camera'}
+            </button>
+            {cameraUnavailable && (
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={disabled}
+              >
+                <ImageUp size={16} />
+                Upload photo
+              </button>
+            )}
+          </>
         )}
       </div>
     </div>

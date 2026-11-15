@@ -5,7 +5,8 @@ import {
   api,
   submitCheckIn,
   type Attendance,
-  type CheckInLocation
+  type CheckInLocation,
+  type PhotoSource
 } from '../../lib/api'
 import { useSession } from '../../lib/auth-context'
 import { formatDate, formatTime, getWibToday } from '../../lib/format'
@@ -44,6 +45,7 @@ export default function CheckInPage() {
   const [locationError, setLocationError] = useState('')
 
   const [photo, setPhoto] = useState<Blob | null>(null)
+  const [photoSource, setPhotoSource] = useState<PhotoSource>('CAMERA')
   const [note, setNote] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
@@ -95,7 +97,7 @@ export default function CheckInPage() {
     setSubmitError('')
 
     try {
-      const record = await submitCheckIn(token, photo, location, note.trim())
+      const record = await submitCheckIn(token, photo, photoSource, location, note.trim())
       setTodayRecord(record)
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : 'Check-in failed')
@@ -229,7 +231,13 @@ export default function CheckInPage() {
             </div>
           </div>
 
-          <CameraCapture onChange={setPhoto} disabled={submitting} />
+          <CameraCapture
+            onChange={(newPhoto, source) => {
+              setPhoto(newPhoto)
+              setPhotoSource(source)
+            }}
+            disabled={submitting}
+          />
         </section>
       </div>
 

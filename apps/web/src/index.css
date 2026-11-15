@@ -1289,10 +1289,29 @@ button.calendar-day:hover {
 }
 
 .camera-frame {
+  position: relative;
   overflow: hidden;
   height: var(--frame-height);
   border-radius: var(--radius-sm);
   background: #0f172a;
+}
+
+/* Label on the preview when the photo is an uploaded file */
+.photo-source-tag {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.75);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.upload-hint {
+  margin: 0;
+  font-size: 13px;
 }
 
 .camera-frame video,

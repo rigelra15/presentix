@@ -91,6 +91,16 @@ export default function AttendanceDetailPage() {
                   <dd>{formatDate(record.attendanceDate)}</dd>
                   <dt>Check-in time</dt>
                   <dd>{formatTime(record.checkedInAt)}</dd>
+                  <dt>Photo</dt>
+                  <dd>
+                    {record.photoSource === 'UPLOAD' ? (
+                      <span className="badge badge-warning">Uploaded file</span>
+                    ) : record.photoSource === 'CAMERA' ? (
+                      <span className="badge badge-success">Live camera</span>
+                    ) : (
+                      '-'
+                    )}
+                  </dd>
                 </dl>
               </section>
 

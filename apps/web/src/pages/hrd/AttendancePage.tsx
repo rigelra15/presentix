@@ -165,6 +165,7 @@ export default function AttendancePage() {
                     <th>Date</th>
                     <th>Time</th>
                     <th>Agenda</th>
+                    <th>Photo</th>
                     <th>Location</th>
                     <th></th>
                   </tr>
@@ -188,6 +189,15 @@ export default function AttendancePage() {
                           <span className="note-preview" title={record.note ?? undefined}>
                             {record.note || '-'}
                           </span>
+                        </td>
+                        <td>
+                          {record.photoSource === 'UPLOAD' ? (
+                            <span className="badge badge-warning">Uploaded</span>
+                          ) : record.photoSource === 'CAMERA' ? (
+                            <span className="badge badge-muted">Camera</span>
+                          ) : (
+                            <span className="muted">-</span>
+                          )}
                         </td>
                         <td>
                           {record.latitude !== null ? (
