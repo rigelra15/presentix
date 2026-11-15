@@ -20,11 +20,11 @@ export class AttendancesController {
       limits: {
         fileSize: 5 * 1024 * 1024,
         files: 1,
-        // latitude, longitude, accuracy, note
-        fields: 4,
+        // latitude, longitude, accuracy, note, photoSource
+        fields: 5,
         // 500 characters can be up to 2000 bytes in UTF-8
         fieldSize: 2000,
-        parts: 5,
+        parts: 6,
       },
     }),
   )

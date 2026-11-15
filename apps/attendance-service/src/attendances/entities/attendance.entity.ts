@@ -42,6 +42,15 @@ export class Attendance {
   })
   photoPath!: string;
 
+  // 'CAMERA' or 'UPLOAD' (see the AddAttendancePhotoSource migration)
+  @Column({
+    name: 'photo_source',
+    type: 'varchar',
+    length: 10,
+    nullable: true,
+  })
+  photoSource!: 'CAMERA' | 'UPLOAD' | null;
+
   // MySQL returns decimal values as strings, so the type is string here.
   @Column({
     type: 'decimal',

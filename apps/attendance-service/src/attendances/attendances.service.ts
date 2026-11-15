@@ -40,6 +40,7 @@ export class AttendancesService {
         attendance.longitude === null ? null : Number(attendance.longitude),
       locationAccuracy: attendance.locationAccuracy,
       note: attendance.note,
+      photoSource: attendance.photoSource,
       photoUrl: `/attendances/${attendance.id}/photo`,
     };
   }
@@ -124,6 +125,14 @@ export class AttendancesService {
       throw new BadRequestException('Note must be 3 to 500 characters');
     }
 
+    // How the photo was taken. This comes from the browser, so it is only
+    // a label for HRD, not a proof.
+    const photoSource = body.photoSource;
+
+    if (photoSource !== 'CAMERA' && photoSource !== 'UPLOAD') {
+      throw new BadRequestException('photoSource must be CAMERA or UPLOAD');
+    }
+
     if (!file?.buffer?.length) {
       throw new BadRequestException('Photo is required');
     }
@@ -191,6 +200,7 @@ export class AttendancesService {
         longitude: longitude.toFixed(6),
         locationAccuracy: Math.round(accuracy),
         note,
+        photoSource,
       });
 
       const saved = await this.attendances.save(attendance);
