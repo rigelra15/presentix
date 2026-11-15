@@ -5,7 +5,7 @@ import { api, type Attendance, type Employee } from '../../lib/api'
 import { useSession } from '../../lib/auth-context'
 import { formatDate, formatTime } from '../../lib/format'
 import { Alert, Loading, PageHeader, StatusBadge } from '../../components/ui'
-import LocationMap from '../../components/LocationMap'
+import LocationMap from '../../components/LazyLocationMap'
 import ProtectedPhoto from '../../components/ProtectedPhoto'
 
 export default function AttendanceDetailPage() {

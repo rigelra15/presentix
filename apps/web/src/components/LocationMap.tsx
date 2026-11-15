@@ -1,39 +1,57 @@
+import { useEffect, useRef } from 'react'
+import * as maplibregl from 'maplibre-gl'
+import 'maplibre-gl/dist/maplibre-gl.css'
+import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url'
 import { ExternalLink, MapPin } from 'lucide-react'
 import { formatCoordinates } from '../lib/format'
+
+// MapLibre runs map work in a web worker. With Vite we have to
+// tell MapLibre where the bundled worker file is.
+maplibregl.setWorkerUrl(workerUrl)
+
+// Free vector map style from OpenFreeMap (no API key needed)
+const MAP_STYLE = 'https://tiles.openfreemap.org/styles/positron'
 
 interface Props {
   latitude: number
   longitude: number
   accuracy?: number | null
-  height?: number
+  // fill = same size as the camera frame on the check-in page
+  fill?: boolean
 }
 
-// Small OpenStreetMap preview. Uses the public embed page,
-// so no map library or API key is needed.
-export default function LocationMap({ latitude, longitude, accuracy, height = 220 }: Props) {
-  const delta = 0.004 // about 400 m around the point
+export default function LocationMap({ latitude, longitude, accuracy, fill }: Props) {
+  const containerRef = useRef<HTMLDivElement>(null)
 
-  const bbox = [
-    longitude - delta,
-    latitude - delta,
-    longitude + delta,
-    latitude + delta
-  ].join(',')
+  useEffect(() => {
+    if (!containerRef.current) return
 
-  const embedUrl =
-    'https://www.openstreetmap.org/export/embed.html' +
-    `?bbox=${bbox}&layer=mapnik&marker=${latitude},${longitude}`
+    const map = new maplibregl.Map({
+      container: containerRef.current,
+      style: MAP_STYLE,
+      center: [longitude, latitude], // MapLibre uses [lng, lat]
+      zoom: 15,
+      attributionControl: { compact: true },
+      // Needs two fingers / Ctrl+scroll to move the map,
+      // so scrolling the page does not get stuck on the map.
+      cooperativeGestures: true
+    })
+
+    map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right')
+
+    new maplibregl.Marker({ color: '#0f766e' })
+      .setLngLat([longitude, latitude])
+      .addTo(map)
+
+    // Clean up the map when the component is removed or the location changes
+    return () => map.remove()
+  }, [latitude, longitude])
 
   const googleMapsUrl = `https://www.google.com/maps?q=${latitude},${longitude}`
 
   return (
-    <div className="location-map">
-      <iframe
-        title="Check-in location map"
-        src={embedUrl}
-        style={{ height }}
-        loading="lazy"
-      />
+    <div className={`location-map ${fill ? 'location-map-fill' : ''}`}>
+      <div ref={containerRef} className="map-canvas" />
       <div className="location-meta">
         <span>
           <MapPin size={14} />

@@ -6,7 +6,7 @@ and their GPS location, and HRD manages employee data and monitors attendance
 
 ## Tech stack
 
-- **Frontend:** React + TypeScript + Vite (`apps/web`)
+- **Frontend:** React + TypeScript + Vite, React Router, MapLibre GL JS (`apps/web`)
 - **Backend:** 2 NestJS services (TypeScript)
   - `apps/employee-service` – login (JWT), employee master data
   - `apps/attendance-service` – check-in (photo + GPS), attendance history
@@ -127,7 +127,8 @@ npm run check:login
 - Deactivate / reactivate employees (see "Delete" below)
 - Monitor all attendance: search by name or code, filter by department and date
 - Attendance detail: photo, check-in info and a map of the location
-  (OpenStreetMap, plus a link to Google Maps)
+  (MapLibre GL JS with the free OpenFreeMap Positron style, no API key needed,
+  plus a link to Google Maps)
 
 ### Pages
 

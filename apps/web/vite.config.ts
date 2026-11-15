@@ -9,6 +9,10 @@ const attendanceApi = process.env.ATTENDANCE_API_URL ?? 'http://127.0.0.1:3001'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
+  build: {
+    // The MapLibre chunk is ~1 MB. It is lazy-loaded only on pages with a map.
+    chunkSizeWarningLimit: 1200
+  },
   server: {
     proxy: {
       '/api/employee': {
