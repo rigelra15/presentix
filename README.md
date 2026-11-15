@@ -1,14 +1,15 @@
 # WFH Attendance
 
-A web app where employees log in and submit a WFH check-in with a photo, and HRD
-manages employee data and monitors attendance (view only).
+A web app where employees log in and check in for WFH with a live camera photo
+and their GPS location, and HRD manages employee data and monitors attendance
+(view only).
 
 ## Tech stack
 
 - **Frontend:** React + TypeScript + Vite (`apps/web`)
 - **Backend:** 2 NestJS services (TypeScript)
   - `apps/employee-service` – login (JWT), employee master data
-  - `apps/attendance-service` – check-in, photo upload, attendance history
+  - `apps/attendance-service` – check-in (photo + GPS), attendance history
 - **Database:** MySQL 8.4 (Docker), TypeORM migrations
 - **Password hashing:** Argon2id
 
@@ -110,18 +111,52 @@ npm run check:login
 
 **Employee**
 - Login
-- WFH check-in with a photo (JPEG/PNG, max 5 MB). Date and time are taken from
-  the server, not from the browser
+- WFH check-in in 2 steps:
+  1. **GPS location** from the browser (required, the API rejects a check-in
+     without valid coordinates)
+  2. **Live photo** taken with the device camera. There is no file picker, so
+     an old photo from the gallery cannot be uploaded
+- Date and time are taken from the server, not from the browser
 - Only one check-in per day (Asia/Jakarta date). This is also enforced by a
   unique index in the database
-- See own attendance history
+- Attendance history with a link to each check-in location
 
 **HRD**
-- Login
+- Overview: active employees, who checked in today, and who has not
 - Add, view, and update employees
 - Deactivate / reactivate employees (see "Delete" below)
-- Monitor all attendance: search by employee name, code or department, filter
-  by date, and preview the check-in photo
+- Monitor all attendance: search by name or code, filter by department and date
+- Attendance detail: photo, check-in info and a map of the location
+  (OpenStreetMap, plus a link to Google Maps)
+
+### Pages
+
+| URL                       | Who      | Page                               |
+| ------------------------- | -------- | ---------------------------------- |
+| `/login`                  | everyone | Sign in                            |
+| `/check-in`               | Employee | Today's check-in                   |
+| `/history`                | Employee | My attendance history              |
+| `/hrd`                    | HRD      | Overview                           |
+| `/hrd/employees`          | HRD      | Employee list                      |
+| `/hrd/employees/new`      | HRD      | Add employee                       |
+| `/hrd/employees/:id/edit` | HRD      | Edit employee                      |
+| `/hrd/attendance`         | HRD      | Attendance list with filters       |
+| `/hrd/attendance/:id`     | HRD      | Attendance detail (photo + map)    |
+
+The login session is kept in `sessionStorage`, so it survives a page refresh
+but is cleared when the tab is closed. When the token expires (30 min) the
+user is sent back to the login page.
+
+### Camera and GPS notes
+
+- Browsers only allow camera and GPS on `https://` or `http://localhost`.
+  To try it on a phone in the same network, the web app must be served over
+  HTTPS (opening `http://<laptop-ip>:5173` will block the camera).
+- Camera-only photos and GPS make cheating harder for normal users, but a
+  determined user could still use a virtual camera or a fake GPS app. The
+  server records its own time and stores the GPS accuracy so HRD can spot
+  unusual check-ins. Stronger checks (e.g. office geofencing, face matching)
+  are out of scope for this project.
 
 ### Why "delete" is a deactivate
 
@@ -150,11 +185,20 @@ All endpoints except login need `Authorization: Bearer <token>`.
 
 | Method | Path                     | Role            | Description                         |
 | ------ | ------------------------ | --------------- | ----------------------------------- |
-| POST   | `/attendances`           | EMPLOYEE        | Check in (multipart field `photo`)  |
+| POST   | `/attendances`           | EMPLOYEE        | Check in (multipart, see below)     |
 | GET    | `/attendances/me`        | EMPLOYEE        | Own attendance history              |
 | GET    | `/attendances`           | HRD             | All attendance                      |
 | GET    | `/attendances/:id`       | HRD / owner     | Attendance detail                   |
 | GET    | `/attendances/:id/photo` | HRD / owner     | Check-in photo                      |
+
+`POST /attendances` is `multipart/form-data` with these fields:
+
+| Field       | Rules                              |
+| ----------- | ---------------------------------- |
+| `latitude`  | number, -90 to 90                  |
+| `longitude` | number, -180 to 180                |
+| `accuracy`  | number in meters, from the browser |
+| `photo`     | JPEG or PNG, max 5 MB              |
 
 ## Database
 
@@ -165,7 +209,10 @@ All endpoints except login need `Authorization: Bearer <token>`.
 
 **attendance_db**
 - `attendances` – id, employee_id, attendance_date, checked_in_at, photo_path,
-  created_at. Unique index on (employee_id, attendance_date)
+  latitude, longitude, location_accuracy, created_at.
+  Unique index on (employee_id, attendance_date).
+  The location columns were added by a later migration and are empty for
+  check-ins made before it.
 
 `employee_id` has no foreign key because it lives in another service's
 database. Photos are saved on disk in `storage/attendance-photos/` (git-ignored),
@@ -199,6 +246,8 @@ Defaults work for local development. These environment variables can override th
 | `JWT_SECRET_FILE`       | employee-service   | `docker/secrets/jwt_access_secret`         |
 | `EMPLOYEE_SERVICE_URL`  | attendance-service | `http://127.0.0.1:3000`                    |
 | `ATTENDANCE_PHOTO_DIR`  | attendance-service | `storage/attendance-photos`                |
+| `EMPLOYEE_API_URL`      | web (Vite proxy)   | `http://127.0.0.1:3000`                    |
+| `ATTENDANCE_API_URL`    | web (Vite proxy)   | `http://127.0.0.1:3001`                    |
 
 ## Security notes
 
