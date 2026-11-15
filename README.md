@@ -1,7 +1,7 @@
 # WFH Attendance
 
-A web app where employees log in and check in for WFH with a live camera photo
-and their GPS location, and HRD manages employee data and monitors attendance
+A web app where employees log in and check in for WFH with a live camera photo,
+their GPS location and a short note about today's agenda, and HRD manages employee data and monitors attendance
 (view only).
 
 ## Tech stack
@@ -111,22 +111,25 @@ npm run check:login
 
 **Employee**
 - Login
-- WFH check-in in 2 steps:
+- WFH check-in in 3 steps:
   1. **GPS location** from the browser (required, the API rejects a check-in
      without valid coordinates)
   2. **Live photo** taken with the device camera. There is no file picker, so
      an old photo from the gallery cannot be uploaded
+  3. **Today's agenda**: a short note (3–500 characters) about what the
+     employee works on today. HRD can read it
 - Date and time are taken from the server, not from the browser
 - Only one check-in per day (Asia/Jakarta date). This is also enforced by a
   unique index in the database
-- Attendance history with a link to each check-in location
+- After check-in, the employee sees their own photo, agenda and location
+- Attendance history, with a detail page for each check-in (photo, agenda, map)
 
 **HRD**
-- Overview: active employees, who checked in today, and who has not
+- Overview: active employees, who checked in today (with their agenda), and who has not
 - Add, view, and update employees
 - Deactivate / reactivate employees (see "Delete" below)
 - Monitor all attendance: search by name or code, filter by department and date
-- Attendance detail: photo, check-in info and a map of the location
+- Attendance detail: photo, check-in info, agenda and a map of the location
   (MapLibre GL JS with the free OpenFreeMap Positron style, no API key needed,
   plus a link to Google Maps)
 
@@ -137,6 +140,7 @@ npm run check:login
 | `/login`                  | everyone | Sign in                            |
 | `/check-in`               | Employee | Today's check-in                   |
 | `/history`                | Employee | My attendance history              |
+| `/history/:id`            | Employee | My check-in detail (photo + map)   |
 | `/hrd`                    | HRD      | Overview                           |
 | `/hrd/employees`          | HRD      | Employee list                      |
 | `/hrd/employees/new`      | HRD      | Add employee                       |
@@ -199,6 +203,7 @@ All endpoints except login need `Authorization: Bearer <token>`.
 | `latitude`  | number, -90 to 90                  |
 | `longitude` | number, -180 to 180                |
 | `accuracy`  | number in meters, from the browser |
+| `note`      | text, 3 to 500 characters          |
 | `photo`     | JPEG or PNG, max 5 MB              |
 
 ## Database
@@ -210,10 +215,10 @@ All endpoints except login need `Authorization: Bearer <token>`.
 
 **attendance_db**
 - `attendances` – id, employee_id, attendance_date, checked_in_at, photo_path,
-  latitude, longitude, location_accuracy, created_at.
+  latitude, longitude, location_accuracy, note, created_at.
   Unique index on (employee_id, attendance_date).
-  The location columns were added by a later migration and are empty for
-  check-ins made before it.
+  The location and note columns were added by later migrations and are empty
+  for check-ins made before them.
 
 `employee_id` has no foreign key because it lives in another service's
 database. Photos are saved on disk in `storage/attendance-photos/` (git-ignored),
