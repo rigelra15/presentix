@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, ConflictException, Injectable, NotFoundException, ServiceUnavailableException } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { DataSource, QueryFailedError } from "typeorm";
 import type { Repository } from "typeorm";
@@ -12,6 +12,9 @@ import type { UpdateEmployeeDto } from "./dto/update-employee.dto.js";
 
 @Injectable()
 export class EmployeesService {
+  private readonly attendanceServiceUrl =
+    process.env.ATTENDANCE_SERVICE_URL ?? 'http://127.0.0.1:3001';
+
   constructor(
     @InjectRepository(Employee)
     private readonly employees: Repository<Employee>,
@@ -180,6 +183,72 @@ export class EmployeesService {
     }
 
     return this.findOne(id);
+  }
+
+  // Asks attendance-service how many check-ins this employee has.
+  // The HRD's own token is passed on, so attendance-service can check it.
+  private async countAttendance(
+    employeeId: number,
+    authorization: string,
+  ): Promise<number> {
+    try {
+      const response = await fetch(
+        `${this.attendanceServiceUrl}/attendances?employeeId=${employeeId}`,
+        {
+          headers: { Authorization: authorization },
+          signal: AbortSignal.timeout(3000),
+        },
+      );
+
+      if (response.ok) {
+        const records = (await response.json()) as unknown[];
+        return records.length;
+      }
+    } catch {
+      // handled below
+    }
+
+    // If we cannot be sure, do not delete anything
+    throw new ServiceUnavailableException(
+      'Cannot check attendance records right now. Please try again later.',
+    );
+  }
+
+  async remove(id: number, authorization: string) {
+    const employee = await this.employees.findOne({
+      where: { id },
+      relations: { user: true },
+    });
+
+    if (!employee) {
+      throw new NotFoundException('Employee not found');
+    }
+
+    // Deactivating first means the employee cannot log in
+    // and check in while they are being deleted.
+    if (employee.isActive) {
+      throw new ConflictException(
+        'Deactivate the employee before deleting them.',
+      );
+    }
+
+    // Attendance lives in another database, so deleting an employee with
+    // records would leave check-ins (and photos) without an owner.
+    const attendanceCount = await this.countAttendance(id, authorization);
+
+    if (attendanceCount > 0) {
+      throw new ConflictException(
+        `This employee has ${attendanceCount} attendance record(s), so they cannot be deleted. Keep them deactivated instead.`,
+      );
+    }
+
+    // The employee row points to the user, so delete it first
+    await this.dataSource.transaction(async (manager) => {
+      await manager.delete(Employee, { id: employee.id });
+      await manager.delete(User, { id: employee.user.id });
+    });
+
+    return { id, deleted: true };
   }
 
   async deactivate(id: number) {

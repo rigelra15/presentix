@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  Headers,
   HttpCode,
   HttpStatus,
   Param,
@@ -58,6 +59,17 @@ export class EmployeesController {
     @Body() dto: UpdateEmployeeDto,
   ) {
     return this.employeesService.update(id, dto);
+  }
+
+  // Removes the employee and their login account for good.
+  // Only allowed for deactivated employees without attendance records.
+  @Delete(':id/permanent')
+  @HttpCode(HttpStatus.OK)
+  remove(
+    @Param('id', ParseIntPipe) id: number,
+    @Headers('authorization') authorization: string,
+  ) {
+    return this.employeesService.remove(id, authorization);
   }
 
   @Delete(':id')
