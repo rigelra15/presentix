@@ -349,12 +349,14 @@ export default function HrdDashboard({ token }: Props) {
                   onChange={event =>
                     updateField('password', event.target.value)
                   }
-                  minLength={12}
+                  minLength={8}
                   maxLength={128}
+                  pattern="(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9]).{8,128}"
+                  title="At least 8 characters with an uppercase letter, a lowercase letter and a number"
                   autoComplete="new-password"
                   required
                 />
-                <small>Minimum 12 characters.</small>
+                <small>Min 8 characters, with uppercase, lowercase and a number.</small>
               </label>
             )}
           </div>

@@ -79,8 +79,11 @@ terminal:
 npm run create-hrd
 ```
 
-The script asks for an email and a password (min 12 characters, hidden while
-typing) and saves the password as an Argon2id hash.
+The script asks for an email and a password (hidden while typing) and saves
+the password as an Argon2id hash.
+
+Password rule (same for HRD and employees): at least 8 characters, with an
+uppercase letter, a lowercase letter and a number.
 
 Then log in as that HRD and add employees from the **Employee Management**
 page. Each employee gets their own login account (email + password set by HRD).

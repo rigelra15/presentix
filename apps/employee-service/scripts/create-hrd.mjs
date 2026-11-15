@@ -61,11 +61,22 @@ async function main() {
     throw new Error('Email is not valid');
   }
 
-  const password = await askHidden('Password (min 12 characters): ');
+  const password = await askHidden(
+    'Password (min 8 chars, uppercase, lowercase, number): ',
+  );
   const confirm = await askHidden('Repeat password: ');
 
-  if (password.length < 12) {
-    throw new Error('Password must be at least 12 characters');
+  // Same rule as CreateEmployeeDto in the API
+  if (
+    password.length < 8 ||
+    password.length > 128 ||
+    !/[a-z]/.test(password) ||
+    !/[A-Z]/.test(password) ||
+    !/[0-9]/.test(password)
+  ) {
+    throw new Error(
+      'Password must be 8-128 characters and contain an uppercase letter, a lowercase letter and a number',
+    );
   }
 
   if (password !== confirm) {
