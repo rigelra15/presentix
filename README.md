@@ -57,10 +57,33 @@ npm run setup
    On first start, `docker/mysql/init.sh` creates both databases and DB users
 3. `build` – builds all apps
 4. `migrate` – runs the TypeORM migrations for both services
-5. `seed` – creates 2 demo accounts (HRD and Employee)
 
-The demo account emails and passwords are generated randomly and saved in
-`docker/secrets/demo-accounts.json`. Open that file to see them.
+After this the database is empty. Create accounts with **one** of these options.
+
+### Option A – demo accounts (quick try)
+
+```bash
+npm run seed
+```
+
+Creates one HRD and one employee account. The emails and passwords are
+generated randomly and saved in `docker/secrets/demo-accounts.json`. Open that
+file to see them.
+
+### Option B – real accounts (empty database)
+
+There is no public sign-up page, so the first HRD account is created from the
+terminal:
+
+```bash
+npm run create-hrd
+```
+
+The script asks for an email and a password (min 12 characters, hidden while
+typing) and saves the password as an Argon2id hash.
+
+Then log in as that HRD and add employees from the **Employee Management**
+page. Each employee gets their own login account (email + password set by HRD).
 
 ## Running the app
 
@@ -72,9 +95,9 @@ npm run dev:attendance   # http://localhost:3001
 npm run dev:web          # http://localhost:5173
 ```
 
-Then open http://localhost:5173 and log in with one of the demo accounts.
+Then open http://localhost:5173 and log in with a demo account or the HRD account you created.
 
-Optional check that login works (employee service must be running):
+Optional check that login works with the demo accounts (employee service must be running):
 
 ```bash
 npm run check:login
