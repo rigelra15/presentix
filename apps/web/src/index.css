@@ -999,6 +999,27 @@ input:focus, select:focus, textarea:focus {
   height: var(--frame-height);
 }
 
+.location-address {
+  display: flex;
+  gap: 8px;
+  margin: 0;
+  padding: 10px 12px 0;
+  border-top: 1px solid var(--border);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.location-address svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--primary);
+}
+
+/* The address row already has the top border */
+.location-address + .location-meta {
+  border-top: 0;
+}
+
 .location-meta {
   display: flex;
   flex-wrap: wrap;

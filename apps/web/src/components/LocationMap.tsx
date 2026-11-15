@@ -1,9 +1,10 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import * as maplibregl from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url'
-import { ExternalLink, MapPin } from 'lucide-react'
+import { Building2, ExternalLink, MapPin } from 'lucide-react'
 import { formatCoordinates } from '../lib/format'
+import { getAddress } from '../lib/geocode'
 
 // MapLibre runs map work in a web worker. With Vite we have to
 // tell MapLibre where the bundled worker file is.
@@ -22,6 +23,24 @@ interface Props {
 
 export default function LocationMap({ latitude, longitude, accuracy, fill }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
+
+  // Address of the coordinates. "key" tells which coordinates it belongs to,
+  // so an old address is not shown after the location changes.
+  const key = `${latitude},${longitude}`
+  const [addressResult, setAddressResult] = useState<{ key: string; address: string | null } | null>(null)
+  const addressLoading = addressResult?.key !== key
+
+  useEffect(() => {
+    let cancelled = false
+
+    getAddress(latitude, longitude).then(address => {
+      if (!cancelled) setAddressResult({ key, address })
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [latitude, longitude, key])
 
   useEffect(() => {
     if (!containerRef.current) return
@@ -52,6 +71,15 @@ export default function LocationMap({ latitude, longitude, accuracy, fill }: Pro
   return (
     <div className={`location-map ${fill ? 'location-map-fill' : ''}`}>
       <div ref={containerRef} className="map-canvas" />
+
+      {/* Nothing is shown if the address cannot be found */}
+      {(addressLoading || addressResult?.address) && (
+        <p className="location-address">
+          <Building2 size={15} />
+          {addressLoading ? <span className="muted">Looking up address...</span> : addressResult?.address}
+        </p>
+      )}
+
       <div className="location-meta">
         <span>
           <MapPin size={14} />
