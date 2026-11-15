@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { CalendarCheck, CheckCircle2, LocateFixed, Send } from 'lucide-react'
+import { CalendarCheck, CheckCircle2, LocateFixed, MapPin, Send } from 'lucide-react'
 import {
   api,
   submitCheckIn,
@@ -11,7 +11,7 @@ import { useSession } from '../../lib/auth-context'
 import { formatDate, formatTime, getWibToday } from '../../lib/format'
 import { Alert, Loading, PageHeader } from '../../components/ui'
 import CameraCapture from '../../components/CameraCapture'
-import LocationMap from '../../components/LocationMap'
+import LocationMap from '../../components/LazyLocationMap'
 
 function locationErrorMessage(error: GeolocationPositionError): string {
   if (error.code === error.PERMISSION_DENIED) {
@@ -169,25 +169,33 @@ export default function CheckInPage() {
             </div>
           </div>
 
-          {location && (
+          {location ? (
             <LocationMap
               latitude={location.latitude}
               longitude={location.longitude}
               accuracy={Math.round(location.accuracy)}
+              fill
             />
+          ) : (
+            <div className="frame-placeholder">
+              <MapPin size={36} />
+              <span>{locating ? 'Finding your location...' : 'Location not shared yet'}</span>
+            </div>
           )}
 
           {locationError && <p className="field-error">{locationError}</p>}
 
-          <button
-            type="button"
-            className={`btn ${location ? 'btn-secondary' : 'btn-primary'}`}
-            onClick={getLocation}
-            disabled={locating || submitting}
-          >
-            <LocateFixed size={16} />
-            {locating ? 'Getting location...' : location ? 'Refresh location' : 'Get my location'}
-          </button>
+          <div className="step-actions">
+            <button
+              type="button"
+              className={`btn ${location ? 'btn-secondary' : 'btn-primary'}`}
+              onClick={getLocation}
+              disabled={locating || submitting}
+            >
+              <LocateFixed size={16} />
+              {locating ? 'Getting location...' : location ? 'Refresh location' : 'Get my location'}
+            </button>
+          </div>
         </section>
 
         <section className="card step-card">

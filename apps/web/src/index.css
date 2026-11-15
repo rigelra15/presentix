@@ -870,6 +870,9 @@ input:focus, select:focus {
 }
 
 .step-card {
+  /* Shared height for the map, the camera and their empty frames.
+     A fixed height (not aspect-ratio + max-height) keeps them full width. */
+  --frame-height: 320px;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -880,6 +883,11 @@ input:focus, select:focus {
   display: flex;
   gap: 10px;
   margin-top: auto;
+}
+
+/* Buttons fill the card width (2 buttons share it) */
+.step-actions .btn {
+  flex: 1;
 }
 
 .step-head {
@@ -923,8 +931,7 @@ input:focus, select:focus {
 
 .camera-frame {
   overflow: hidden;
-  aspect-ratio: 4 / 3;
-  max-height: 420px;
+  height: var(--frame-height);
   border-radius: var(--radius-sm);
   background: #0f172a;
 }
@@ -951,8 +958,7 @@ input:focus, select:focus {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  aspect-ratio: 4 / 3;
-  max-height: 420px;
+  height: var(--frame-height);
   border: 1px dashed #cbd5e1;
   border-radius: var(--radius-sm);
   background: #f8fafc;
@@ -978,11 +984,9 @@ input:focus, select:focus {
   background: #eef1f4;
 }
 
-/* On the check-in page the map has the same size as the camera frame */
+/* On the check-in page the map has the same height as the camera frame */
 .location-map-fill .map-canvas {
-  height: auto;
-  aspect-ratio: 4 / 3;
-  max-height: 420px;
+  height: var(--frame-height);
 }
 
 .location-meta {

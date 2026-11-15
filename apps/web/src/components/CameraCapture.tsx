@@ -124,7 +124,7 @@ export default function CameraCapture({ onChange, disabled }: Props) {
         ) : cameraOn ? (
           <video ref={videoRef} autoPlay playsInline muted className="mirror" />
         ) : (
-          <div className="camera-placeholder">
+          <div className="frame-placeholder">
             <Camera size={36} />
             <span>Camera is off</span>
           </div>
@@ -133,7 +133,7 @@ export default function CameraCapture({ onChange, disabled }: Props) {
 
       {error && <p className="field-error">{error}</p>}
 
-      <div className="camera-actions">
+      <div className="step-actions">
         {previewUrl ? (
           <button type="button" className="btn btn-secondary" onClick={retake} disabled={disabled}>
             <RefreshCw size={16} />
