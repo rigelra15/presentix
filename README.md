@@ -126,12 +126,15 @@ npm run check:login
 
 **HRD**
 - Overview: active employees, who checked in today (with their agenda), and who has not
-- Add, view, and update employees
+- Add, view, and update employees. On "Add employee" the next free code
+  (`EMP-0001`, `EMP-0002`, ...) is filled in automatically and can still be changed
 - Deactivate / reactivate employees (see "Delete" below)
 - Monitor all attendance: search by name or code, filter by department and date
 - Attendance detail: photo, check-in info, agenda and a map of the location
   (MapLibre GL JS with the free OpenFreeMap Positron style, no API key needed,
   plus a link to Google Maps)
+- Every map also shows the street address of the coordinates (reverse
+  geocoding, see below)
 
 ### Pages
 
@@ -163,6 +166,20 @@ user is sent back to the login page.
   unusual check-ins. Stronger checks (e.g. office geofencing, face matching)
   are out of scope for this project.
 
+### Address lookup (reverse geocoding)
+
+The address under each map comes from the free OpenStreetMap
+[Nominatim](https://nominatim.org/) API, called from the browser
+(`apps/web/src/lib/geocode.ts`). No API key is needed. Its usage policy
+allows about 1 request per second, so:
+
+- the address is only looked up where a map is shown (not in tables)
+- results are cached in memory, so the same coordinates are asked only once
+
+The address is not stored in the database. If the lookup fails, only the
+coordinates are shown. Note that this sends the check-in coordinates to
+OpenStreetMap's server.
+
 ### Why "delete" is a deactivate
 
 `DELETE /employees/:id` sets `is_active = false` instead of removing the row.
@@ -181,6 +198,7 @@ All endpoints except login need `Authorization: Bearer <token>`.
 | POST   | `/auth/login`    | –    | Login, returns JWT (30 min)    |
 | GET    | `/auth/me`       | any  | Current user                   |
 | GET    | `/employees`     | HRD  | List employees                 |
+| GET    | `/employees/next-code` | HRD | Next free code, e.g. `EMP-0002` |
 | GET    | `/employees/:id` | HRD  | Employee detail                |
 | POST   | `/employees`     | HRD  | Create employee + login account |
 | PATCH  | `/employees/:id` | HRD  | Update / reactivate employee   |
