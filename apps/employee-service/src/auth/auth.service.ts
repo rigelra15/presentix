@@ -75,7 +75,7 @@ export class AuthService {
     return {
       access_token: accessToken,
       token_type: 'Bearer',
-      expired_in: 1800,
+      expires_in: 1800,
       user: {
         id: user.id,
         email: user.email,
