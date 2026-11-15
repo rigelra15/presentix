@@ -34,6 +34,12 @@ export class EmployeesController {
     return this.employeesService.findAll();
   }
 
+  // Must be above ':id', otherwise "next-code" is read as an id
+  @Get('next-code')
+  getNextCode() {
+    return this.employeesService.getNextCode();
+  }
+
   @Get(':id')
   findOne(
     @Param('id', ParseIntPipe) id: number,

@@ -51,6 +51,32 @@ export class EmployeesService {
     );
   }
 
+  // Suggests the next code in the "EMP-0001" format.
+  // Takes the highest EMP-<number> code and adds 1.
+  // Codes in other formats (e.g. "EMP-DEMO-001") are ignored.
+  async getNextCode() {
+    const employees = await this.employees.find({
+      select: { employeeCode: true },
+    });
+
+    let highest = 0;
+    let digits = 4;
+
+    for (const employee of employees) {
+      const match = /^EMP-(\d+)$/.exec(employee.employeeCode);
+
+      if (match && Number(match[1]) > highest) {
+        highest = Number(match[1]);
+        // Keep the same number of digits, e.g. EMP-0002737 -> EMP-0002738
+        digits = Math.max(4, match[1].length);
+      }
+    }
+
+    const nextNumber = String(highest + 1).padStart(digits, '0');
+
+    return { employeeCode: `EMP-${nextNumber}` };
+  }
+
   async findOne(id: number) {
     const employee = await this.employees.findOne({
       where: { id },
