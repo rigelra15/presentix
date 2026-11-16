@@ -1825,3 +1825,16 @@ button.calendar-day:hover {
 .card-title-row .card-title {
   margin: 0;
 }
+
+/* Buttons next to the page title, e.g. Export CSV + List/Calendar */
+.header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.modal-message .field {
+  margin: 12px 0;
+  color: var(--text);
+}
