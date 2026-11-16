@@ -51,6 +51,24 @@ export class Attendance {
   })
   photoPath!: string;
 
+  // Face check frames (head turned left / right). NULL for uploaded
+  // photos and for check-ins made before the face check existed.
+  @Column({
+    name: 'liveness_left_path',
+    type: 'varchar',
+    length: 100,
+    nullable: true,
+  })
+  livenessLeftPath!: string | null;
+
+  @Column({
+    name: 'liveness_right_path',
+    type: 'varchar',
+    length: 100,
+    nullable: true,
+  })
+  livenessRightPath!: string | null;
+
   // 'CAMERA' or 'UPLOAD' (see the AddAttendancePhotoSource migration)
   @Column({
     name: 'photo_source',

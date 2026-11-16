@@ -11,10 +11,15 @@ const employee: SessionUser = { id: 10, email: 'a@test', role: 'EMPLOYEE', emplo
 const hrd: SessionUser = { id: 1, email: 'h@test', role: 'HRD' };
 
 // Smallest valid JPEG start (the service only checks the first bytes)
-const jpegFile = {
-  buffer: Buffer.from('ffd8ffe000104a464946', 'hex'),
-  mimetype: 'image/jpeg',
-} as Express.Multer.File;
+const jpegFile = jpeg('photo');
+
+// JPEG start + some text, so each test image has different bytes
+function jpeg(text: string) {
+  return {
+    buffer: Buffer.concat([Buffer.from('ffd8ffe000104a464946', 'hex'), Buffer.from(text)]),
+    mimetype: 'image/jpeg',
+  } as Express.Multer.File;
+}
 
 // A valid check-in form. Tests change one field at a time.
 function validBody(): Record<string, string> {
@@ -23,7 +28,8 @@ function validBody(): Record<string, string> {
     longitude: '106.827153',
     accuracy: '18',
     note: 'Finish the monthly report',
-    photoSource: 'CAMERA',
+    // Uploaded photo: no face check needed (see the liveness tests below)
+    photoSource: 'UPLOAD',
   };
 }
 
@@ -70,11 +76,12 @@ describe('AttendancesService.create', () => {
   it('saves a valid check-in with location, note and photo source', async () => {
     const { service, saved } = createService();
 
-    const result = await service.create(employee, validBody(), jpegFile);
+    const result = await service.create(employee, validBody(), { photo: [jpegFile] });
 
     expect(result.latitude).toBe(-6.175392);
     expect(result.note).toBe('Finish the monthly report');
-    expect(result.photoSource).toBe('CAMERA');
+    expect(result.photoSource).toBe('UPLOAD');
+    expect(result.livenessChecked).toBe(false);
     expect(saved[0].employeeId).toBe(5);
     expect(await readdir(photoDir)).toHaveLength(1);
   });
@@ -82,17 +89,17 @@ describe('AttendancesService.create', () => {
   it('only allows employees to check in', async () => {
     const { service } = createService();
 
-    await expect(service.create(hrd, validBody(), jpegFile)).rejects.toThrow('Only employees');
+    await expect(service.create(hrd, validBody(), { photo: [jpegFile] })).rejects.toThrow('Only employees');
   });
 
   it('rejects a missing or invalid location', async () => {
     const { service } = createService();
 
     await expect(
-      service.create(employee, { ...validBody(), latitude: '' }, jpegFile),
+      service.create(employee, { ...validBody(), latitude: '' }, { photo: [jpegFile] }),
     ).rejects.toThrow('Latitude');
     await expect(
-      service.create(employee, { ...validBody(), longitude: '200' }, jpegFile),
+      service.create(employee, { ...validBody(), longitude: '200' }, { photo: [jpegFile] }),
     ).rejects.toThrow('Longitude');
   });
 
@@ -100,7 +107,7 @@ describe('AttendancesService.create', () => {
     const { service } = createService();
 
     await expect(
-      service.create(employee, { ...validBody(), note: ' a ' }, jpegFile),
+      service.create(employee, { ...validBody(), note: ' a ' }, { photo: [jpegFile] }),
     ).rejects.toThrow('Note must be 3 to 500 characters');
   });
 
@@ -108,7 +115,7 @@ describe('AttendancesService.create', () => {
     const { service } = createService();
 
     await expect(
-      service.create(employee, { ...validBody(), photoSource: 'GALLERY' }, jpegFile),
+      service.create(employee, { ...validBody(), photoSource: 'GALLERY' }, { photo: [jpegFile] }),
     ).rejects.toThrow('photoSource');
   });
 
@@ -119,7 +126,7 @@ describe('AttendancesService.create', () => {
       mimetype: 'image/jpeg',
     } as Express.Multer.File;
 
-    await expect(service.create(employee, validBody(), fakeImage)).rejects.toThrow(
+    await expect(service.create(employee, validBody(), { photo: [fakeImage] })).rejects.toThrow(
       'Photo must be a JPEG or PNG image',
     );
   });
@@ -127,9 +134,113 @@ describe('AttendancesService.create', () => {
   it('allows only one check-in per day', async () => {
     const { service } = createService({ id: 99 });
 
-    await expect(service.create(employee, validBody(), jpegFile)).rejects.toThrow(
+    await expect(service.create(employee, validBody(), { photo: [jpegFile] })).rejects.toThrow(
       'already checked in today',
     );
+    expect(await readdir(photoDir)).toHaveLength(0);
+  });
+});
+
+describe('AttendancesService.create with the face check', () => {
+  let photoDir: string;
+
+  beforeEach(async () => {
+    photoDir = await mkdtemp(join(tmpdir(), 'attendance-test-'));
+    process.env.ATTENDANCE_PHOTO_DIR = photoDir;
+    // Only the clock is faked, so the challenge age can be controlled
+    vi.useFakeTimers({ toFake: ['Date'] });
+  });
+
+  afterEach(async () => {
+    vi.useRealTimers();
+    delete process.env.ATTENDANCE_PHOTO_DIR;
+    await rm(photoDir, { recursive: true, force: true });
+  });
+
+  const cameraBody = (challengeId: string) => ({ ...validBody(), photoSource: 'CAMERA', challengeId });
+  const cameraFiles = () => ({
+    photo: [jpeg('front')],
+    livenessLeft: [jpeg('left')],
+    livenessRight: [jpeg('right')],
+  });
+  const wait = (ms: number) => vi.setSystemTime(Date.now() + ms);
+
+  it('gives the head turns in a random order', () => {
+    const { service } = createService();
+    const challenge = service.createLivenessChallenge(employee);
+
+    expect([...challenge.steps].sort()).toEqual(['LEFT', 'RIGHT']);
+    expect(() => service.createLivenessChallenge(hrd)).toThrow('Only employees');
+  });
+
+  it('saves a camera check-in with both face check frames', async () => {
+    const { service, saved } = createService();
+    const { challengeId } = service.createLivenessChallenge(employee);
+    wait(5000);
+
+    const result = await service.create(employee, cameraBody(challengeId), cameraFiles());
+
+    expect(result.livenessChecked).toBe(true);
+    expect(saved[0].livenessLeftPath).toMatch(/\.jpg$/);
+    expect(await readdir(photoDir)).toHaveLength(3);
+  });
+
+  it('needs a challenge and the frames for a camera check-in', async () => {
+    const { service } = createService();
+    const { challengeId } = service.createLivenessChallenge(employee);
+    wait(5000);
+
+    await expect(
+      service.create(employee, cameraBody('made-up'), cameraFiles()),
+    ).rejects.toThrow('face check is missing');
+    await expect(
+      service.create(employee, cameraBody(challengeId), { photo: [jpeg('front')] }),
+    ).rejects.toThrow('Face check photos are missing');
+  });
+
+  it('uses a challenge only once', async () => {
+    const { service } = createService();
+    const { challengeId } = service.createLivenessChallenge(employee);
+    wait(5000);
+
+    await service.create(employee, cameraBody(challengeId), cameraFiles());
+
+    await expect(
+      service.create(employee, cameraBody(challengeId), cameraFiles()),
+    ).rejects.toThrow('already used');
+  });
+
+  it("rejects another employee's, an old or a too quick challenge", async () => {
+    const { service } = createService();
+    const other = service.createLivenessChallenge({ ...employee, employeeId: 6 });
+    const quick = service.createLivenessChallenge(employee);
+
+    await expect(
+      service.create(employee, cameraBody(quick.challengeId), cameraFiles()),
+    ).rejects.toThrow('too quickly');
+
+    wait(11 * 60 * 1000);
+
+    await expect(
+      service.create(employee, cameraBody(other.challengeId), cameraFiles()),
+    ).rejects.toThrow('already used');
+    await expect(
+      service.create(employee, cameraBody(quick.challengeId), cameraFiles()),
+    ).rejects.toThrow('took too long');
+  });
+
+  it('rejects the same picture sent as every frame', async () => {
+    const { service } = createService();
+    const { challengeId } = service.createLivenessChallenge(employee);
+    wait(5000);
+
+    await expect(
+      service.create(employee, cameraBody(challengeId), {
+        photo: [jpeg('same')],
+        livenessLeft: [jpeg('same')],
+        livenessRight: [jpeg('same')],
+      }),
+    ).rejects.toThrow('must be different');
     expect(await readdir(photoDir)).toHaveLength(0);
   });
 });

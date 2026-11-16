@@ -14,13 +14,28 @@ import { QueryFailedError } from "typeorm";
 import type { Repository } from "typeorm";
 
 import { Attendance } from "./entities/attendance.entity.js";
+import { getImageExtension } from "./image-type.js";
+import { LivenessChallenges } from "./liveness-challenges.js";
 import type { SessionUser } from "../auth/attendance-auth.guard.js";
+
+// Files of one check-in (multipart form fields)
+export interface CheckInFiles {
+  photo?: Express.Multer.File[];
+  // Face check frames: the employee turned their head left and right
+  livenessLeft?: Express.Multer.File[];
+  livenessRight?: Express.Multer.File[];
+}
+
+// Stored file names are random UUIDs, checked again before reading a file
+const PHOTO_NAME = /^[0-9a-f-]{36}\.(jpg|png)$/;
 
 @Injectable()
 export class AttendancesService {
   private readonly photoDir =
     process.env.ATTENDANCE_PHOTO_DIR ??
     resolve(process.cwd(), '../../storage/attendance-photos');
+
+  private readonly liveness = new LivenessChallenges();
 
   constructor(
     @InjectRepository(Attendance)
@@ -43,6 +58,8 @@ export class AttendancesService {
       note: attendance.note,
       photoSource: attendance.photoSource,
       photoUrl: `/attendances/${attendance.id}/photo`,
+      // true = the employee passed the head-turn face check
+      livenessChecked: attendance.livenessLeftPath !== null,
     };
   }
 
@@ -106,7 +123,7 @@ export class AttendancesService {
   async create(
     user: SessionUser,
     body: Record<string, string>,
-    file?: Express.Multer.File,
+    files: CheckInFiles,
   ) {
     if (user.role !== 'EMPLOYEE' || !user.employeeId) {
       throw new ForbiddenException(
@@ -134,32 +151,49 @@ export class AttendancesService {
       throw new BadRequestException('photoSource must be CAMERA or UPLOAD');
     }
 
-    if (!file?.buffer?.length) {
+    const photo = files.photo?.[0];
+
+    if (!photo?.buffer?.length) {
       throw new BadRequestException('Photo is required');
     }
 
-    const pngSignature = Buffer.from(
-      '89504e470d0a1a0a',
-      'hex',
-    );
+    const photoExtension = getImageExtension(photo);
 
-    const isPng =
-      file.buffer.subarray(0, 8).equals(pngSignature);
-
-    const isJpeg =
-      file.buffer.length >= 3 &&
-      file.buffer[0] === 0xff &&
-      file.buffer[1] === 0xd8 &&
-      file.buffer[2] === 0xff;
-
-    if (
-      (!isPng && !isJpeg) ||
-      (isPng && file.mimetype !== 'image/png') ||
-      (isJpeg && file.mimetype !== 'image/jpeg')
-    ) {
+    if (!photoExtension) {
       throw new BadRequestException(
         'Photo must be a JPEG or PNG image',
       );
+    }
+
+    // A camera check-in must include the face check. An uploaded photo
+    // (only offered when the camera does not work) has none, and HRD
+    // sees that it was uploaded.
+    const frames: { file: Express.Multer.File; extension: 'jpg' | 'png' }[] = [];
+
+    if (photoSource === 'CAMERA') {
+      for (const frame of [files.livenessLeft?.[0], files.livenessRight?.[0]]) {
+        const extension = frame?.buffer?.length ? getImageExtension(frame) : null;
+
+        if (!frame || !extension) {
+          throw new BadRequestException('Face check photos are missing or invalid');
+        }
+
+        frames.push({ file: frame, extension });
+      }
+
+      // The three pictures must be different (not one image sent 3 times)
+      const [left, right] = frames.map(frame => frame.file.buffer);
+
+      if (left.equals(right) || left.equals(photo.buffer) || right.equals(photo.buffer)) {
+        throw new BadRequestException('Face check photos must be different pictures');
+      }
+
+      // Checked last, so a typo in another field does not use up the challenge
+      const livenessError = this.liveness.use(body.challengeId, user.employeeId);
+
+      if (livenessError) {
+        throw new BadRequestException(livenessError);
+      }
     }
 
     const now = new Date();
@@ -176,27 +210,35 @@ export class AttendancesService {
       )
     }
 
-    const filename =
-      `${randomUUID()}.${isPng ? 'png' : 'jpg'}`;
-
     await mkdir(this.photoDir, {
       recursive: true,
       mode: 0o700,
     });
 
-    const filepath = join(this.photoDir, filename);
+    // Photo first, then the face check frames (if any)
+    const toSave = [
+      { buffer: photo.buffer, name: `${randomUUID()}.${photoExtension}` },
+      ...frames.map(frame => ({
+        buffer: frame.file.buffer,
+        name: `${randomUUID()}.${frame.extension}`,
+      })),
+    ];
+    const written: string[] = [];
 
     try {
-      await writeFile(filepath, file.buffer, {
-        flag: 'wx',
-        mode: 0o600,
-      });
+      for (const item of toSave) {
+        const filepath = join(this.photoDir, item.name);
+        await writeFile(filepath, item.buffer, { flag: 'wx', mode: 0o600 });
+        written.push(filepath);
+      }
 
       const attendance = this.attendances.create({
         employeeId: user.employeeId,
         attendanceDate,
         checkedInAt: now,
-        photoPath: filename,
+        photoPath: toSave[0].name,
+        livenessLeftPath: toSave[1]?.name ?? null,
+        livenessRightPath: toSave[2]?.name ?? null,
         latitude: latitude.toFixed(6),
         longitude: longitude.toFixed(6),
         locationAccuracy: Math.round(accuracy),
@@ -208,7 +250,10 @@ export class AttendancesService {
 
       return this.toResponse(saved);
     } catch (error) {
-      await rm(filepath, { force: true }).catch(() => undefined);
+      // Do not keep files of a check-in that was not saved
+      for (const filepath of written) {
+        await rm(filepath, { force: true }).catch(() => undefined);
+      }
 
       if (
         error instanceof QueryFailedError &&
@@ -222,6 +267,15 @@ export class AttendancesService {
 
       throw error;
     }
+  }
+
+  // Step 1 of a camera check-in: which way to turn the head, in which order
+  createLivenessChallenge(user: SessionUser) {
+    if (user.role !== 'EMPLOYEE' || !user.employeeId) {
+      throw new ForbiddenException('Only employees can check in');
+    }
+
+    return this.liveness.create(user.employeeId);
   }
 
   // Check out = the employee finished work today.
@@ -298,27 +352,30 @@ export class AttendancesService {
     return this.toResponse(attendance);
   }
 
-  async getPhoto(id: number, user: SessionUser) {
+  // which: the check-in photo, or one of the face check frames
+  async getPhoto(
+    id: number,
+    user: SessionUser,
+    which: 'photo' | 'left' | 'right' = 'photo',
+  ) {
     const attendance =
       await this.getAuthorizedAttendance(id, user);
 
-    if (
-      !/^[0-9a-f-]{36}\.(jpg|png)$/.test(
-        attendance.photoPath,
-      )
-    ) {
+    const filename =
+      which === 'left'
+        ? attendance.livenessLeftPath
+        : which === 'right'
+          ? attendance.livenessRightPath
+          : attendance.photoPath;
+
+    if (!filename || !PHOTO_NAME.test(filename)) {
       throw new NotFoundException('Photo not found');
     }
-
-    const filepath = join(
-      this.photoDir,
-      attendance.photoPath,
-    );
 
     let content: Buffer;
 
     try {
-      content = await readFile(filepath);
+      content = await readFile(join(this.photoDir, filename));
     } catch (error) {
       if (
         (error as NodeJS.ErrnoException).code === 'ENOENT'
@@ -329,12 +386,8 @@ export class AttendancesService {
       throw error;
     }
 
-    const mimeType = attendance.photoPath.endsWith('.png')
-      ? 'image/png'
-      : 'image/jpeg';
-
     return new StreamableFile(content, {
-      type: mimeType,
+      type: filename.endsWith('.png') ? 'image/png' : 'image/jpeg',
       disposition: 'inline',
     });
   }
