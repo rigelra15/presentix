@@ -15,4 +15,4 @@ if (jwtSecret.length < 32) {
 }
 
 export const jwtIssuer = 'wfh-employee-service';
-export const jwtAudience = 'wfh-attendance';
+export const jwtAudience = 'presentix';

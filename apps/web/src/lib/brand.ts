@@ -1,6 +1,6 @@
 // App name and company email domain, kept in one place
 
-export const APP_NAME = 'Hearthroll'
+export const APP_NAME = 'Presentix'
 
 // Employee login emails use the company domain
 export const EMAIL_DOMAIN = 'dexagroup.com'

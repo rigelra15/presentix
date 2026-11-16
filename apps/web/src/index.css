@@ -346,15 +346,10 @@ input:focus, select:focus, textarea:focus {
 }
 
 .brand-mark {
-  display: grid;
-  place-items: center;
+  display: block;
   flex-shrink: 0;
-  width: 36px;
-  height: 36px;
   border-radius: 10px;
-  background: var(--primary);
-  color: #fff;
-  font-weight: 700;
+  box-shadow: 0 6px 16px rgba(15, 118, 110, 0.35);
 }
 
 .sidebar-close {

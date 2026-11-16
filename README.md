@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="docs/banner.png" alt="Hearthroll – work-from-home attendance" width="100%">
+  <img src="docs/banner.png" alt="Presentix – work-from-home attendance" width="100%">
 </p>
 
-<h1 align="center">Hearthroll</h1>
+<h1 align="center">Presentix</h1>
 
 <p align="center">
   Work-from-home attendance: employees check in and out with a live photo and GPS location,<br>
@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/rigelra15/wfh-attendance/actions/workflows/ci.yml"><img src="https://github.com/rigelra15/wfh-attendance/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/rigelra15/presentix/actions/workflows/ci.yml"><img src="https://github.com/rigelra15/presentix/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <img src="https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=white" alt="React">
   <img src="https://img.shields.io/badge/NestJS-12-E0234E?logo=nestjs&logoColor=white" alt="NestJS">
   <img src="https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white" alt="TypeScript">
@@ -18,7 +18,7 @@
   <img src="https://img.shields.io/badge/OpenAPI-Swagger-85EA2D?logo=swagger&logoColor=black" alt="Swagger">
 </p>
 
-The name comes from **hearth** (home) + **roll call** (attendance).
+The name comes from **presence**: every check-in proves an employee is present, with a live photo and their location.
 
 ## Contents
 

@@ -15,7 +15,7 @@ async function bootstrap() {
 
   // API docs at /docs (Swagger UI) and /docs-json (OpenAPI file)
   const config = new DocumentBuilder()
-    .setTitle('Hearthroll Employee Service')
+    .setTitle('Presentix Employee Service')
     .setDescription('Login, current user and employee data (HRD only).')
     .setVersion('1.0')
     .addBearerAuth()
