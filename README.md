@@ -57,19 +57,35 @@ The name comes from **presence**: every check-in proves an employee is present, 
 
 ## Architecture
 
-```
-            ┌──────────────┐
- Browser ──>│  web (Vite)  │  :5173
-            └──────┬───────┘
-     /api/employee │   /api/attendance
-         ┌─────────┴──────────┐
-         v                    v
- ┌──────────────────┐   ┌────────────────────┐
- │ employee-service │<──│ attendance-service │
- │      :3000       │   │       :3001        │
- └────────┬─────────┘   └─────────┬──────────┘
-          v                       v
-     employee_db             attendance_db      (MySQL :3307)
+```mermaid
+flowchart TB
+    browser["Browser<br/>(React app)"]
+    ext["Outside services<br/>MediaPipe model, map tiles,<br/>Nominatim address"]
+    web["web: Vite dev server :5173<br/>proxies /api/employee and /api/attendance"]
+    calls("HTTP between the services<br/>GET /auth/me: checks every token<br/>GET /attendances?employeeId=: before permanent delete")
+
+    subgraph empside ["employee-service :3000"]
+        emp["login, JWT, employees,<br/>profile photos"]
+        empdb[("employee_db<br/>MySQL")]
+        empfiles[["storage/employee-photos"]]
+    end
+
+    subgraph attside ["attendance-service :3001"]
+        att["face check, check-in,<br/>check-out, history"]
+        attdb[("attendance_db<br/>MySQL")]
+        attfiles[["storage/attendance-photos"]]
+    end
+
+    browser --> web
+    browser -.-> ext
+    web -- "/api/attendance/*" --> att
+    web -- "/api/employee/*" --> emp
+    emp <-.-> calls
+    att <-.-> calls
+    emp --> empdb
+    emp --> empfiles
+    att --> attdb
+    att --> attfiles
 ```
 
 - Each service has its **own database and DB user**. A service cannot read the
