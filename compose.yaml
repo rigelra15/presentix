@@ -45,7 +45,7 @@ services:
       dockerfile: docker/service.Dockerfile
       args:
         SERVICE: employee-service
-    image: wfh-attendance/employee-service
+    image: presentix/employee-service
     restart: unless-stopped
     depends_on:
       mysql:
@@ -76,7 +76,7 @@ services:
       dockerfile: docker/service.Dockerfile
       args:
         SERVICE: attendance-service
-    image: wfh-attendance/attendance-service
+    image: presentix/attendance-service
     restart: unless-stopped
     depends_on:
       mysql:
@@ -105,7 +105,7 @@ services:
     build:
       context: .
       dockerfile: docker/web.Dockerfile
-    image: wfh-attendance/web
+    image: presentix/web
     restart: unless-stopped
     depends_on:
       employee-service:
@@ -125,7 +125,7 @@ services:
   # The passwords are saved to docker/secrets/demo-accounts.json
   seed:
     profiles: ["seed"]
-    image: wfh-attendance/employee-service
+    image: presentix/employee-service
     build:
       context: .
       dockerfile: docker/service.Dockerfile
