@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ChangeEvent } from 'react'
-import { Camera, ImageUp, RefreshCw, ScanFace, ShieldCheck } from 'lucide-react'
+import { Camera, Check, ChevronLeft, ChevronRight, ImageUp, RefreshCw, ScanFace, ShieldCheck } from 'lucide-react'
 import type { FaceLandmarker } from '@mediapipe/tasks-vision'
 import { startFaceCheck, type PhotoSource } from '../lib/api'
 import { useSession } from '../lib/auth-context'
@@ -69,6 +69,13 @@ export default function CameraCapture({ onChange, disabled }: Props) {
   const [instruction, setInstruction] = useState('')
   const [hint, setHint] = useState('')
   const [stepsDone, setStepsDone] = useState(0)
+  // What the guide on the camera shows
+  const [target, setTarget] = useState<HeadDirection | null>(null)
+  const [faceFound, setFaceFound] = useState(false)
+  // 0 to FRAMES_TO_HOLD, fills the progress bar while the pose is held
+  const [framesHeldShown, setFramesHeldShown] = useState(0)
+  // true for a moment after a step is done (green flash)
+  const [stepFlash, setStepFlash] = useState(false)
 
   function stopCamera() {
     cancelledRef.current = true
@@ -125,7 +132,9 @@ export default function CameraCapture({ onChange, disabled }: Props) {
     let framesHeld = 0
 
     setInstruction(INSTRUCTIONS[target])
+    setTarget(target)
     setHint('')
+    setFramesHeldShown(0)
 
     while (framesHeld < FRAMES_TO_HOLD) {
       await nextFrame()
@@ -142,21 +151,30 @@ export default function CameraCapture({ onChange, disabled }: Props) {
 
       const faces = landmarker.detectForVideo(video, performance.now()).faceLandmarks
 
-      if (faces.length === 0) {
-        setHint('No face found. Keep your face inside the frame.')
+      if (faces.length !== 1) {
+        setHint(
+          faces.length === 0
+            ? 'No face found. Keep your face inside the oval.'
+            : 'Only your face should be in the frame.'
+        )
+        setFaceFound(false)
         framesHeld = 0
-        continue
-      }
-
-      if (faces.length > 1) {
-        setHint('Only your face should be in the frame.')
-        framesHeld = 0
+        setFramesHeldShown(0)
         continue
       }
 
       setHint('')
+      setFaceFound(true)
       framesHeld = getHeadDirection(faces[0]) === target ? framesHeld + 1 : 0
+      setFramesHeldShown(framesHeld)
     }
+  }
+
+  // Short green flash on the oval after each step
+  async function flashStep() {
+    setStepFlash(true)
+    await new Promise(resolve => setTimeout(resolve, 450))
+    setStepFlash(false)
   }
 
   async function runFaceCheck() {
@@ -166,6 +184,9 @@ export default function CameraCapture({ onChange, disabled }: Props) {
     setStepsDone(0)
     setInstruction('Preparing the face check...')
     setHint('')
+    setTarget(null)
+    setFaceFound(false)
+    setFramesHeldShown(0)
 
     try {
       // Load the detector and ask the server for the head turn order
@@ -184,6 +205,7 @@ export default function CameraCapture({ onChange, disabled }: Props) {
         await waitForDirection(landmarker, step)
         turns[step] = await captureFrame(videoRef.current!, FACE_CHECK_WIDTH)
         setStepsDone(done => done + 1)
+        await flashStep()
       }
 
       // Main photo: the employee looks at the camera again
@@ -291,14 +313,50 @@ export default function CameraCapture({ onChange, disabled }: Props) {
           <>
             <video ref={videoRef} autoPlay playsInline muted className="mirror" />
             {checking && (
-              <div className="face-check-overlay" aria-live="polite">
-                <strong>{instruction}</strong>
-                {hint && <span>{hint}</span>}
-                <span className="face-check-dots">
-                  <span className={stepsDone > 0 ? 'done' : ''} />
-                  <span className={stepsDone > 1 ? 'done' : ''} />
-                </span>
-              </div>
+              <>
+                {/* Oval where the face should be. The area around it is dimmed. */}
+                <div
+                  className={[
+                    'face-guide',
+                    faceFound ? 'face-found' : '',
+                    framesHeldShown > 0 ? 'face-holding' : '',
+                    stepFlash ? 'face-step-done' : ''
+                  ].join(' ')}
+                  aria-hidden="true"
+                >
+                  {stepFlash && (
+                    <span className="face-guide-check">
+                      <Check size={34} strokeWidth={3} />
+                    </span>
+                  )}
+                </div>
+
+                {/* Moving arrows to the side the head should turn to.
+                    The preview is mirrored, so the employee's left is on the left. */}
+                {!stepFlash && (target === 'LEFT' || target === 'RIGHT') && (
+                  <div className={`turn-arrows turn-${target.toLowerCase()}`} aria-hidden="true">
+                    {[0, 1, 2].map(index =>
+                      target === 'LEFT' ? (
+                        <ChevronLeft key={index} size={40} strokeWidth={3} />
+                      ) : (
+                        <ChevronRight key={index} size={40} strokeWidth={3} />
+                      )
+                    )}
+                  </div>
+                )}
+
+                <div className="face-check-overlay" aria-live="polite">
+                  <strong>{instruction}</strong>
+                  {hint && <span className="face-check-hint">{hint}</span>}
+                  <span className="face-check-progress" aria-hidden="true">
+                    <span style={{ width: `${(framesHeldShown / FRAMES_TO_HOLD) * 100}%` }} />
+                  </span>
+                  <span className="face-check-dots">
+                    <span className={stepsDone > 0 ? 'done' : ''} />
+                    <span className={stepsDone > 1 ? 'done' : ''} />
+                  </span>
+                </div>
+              </>
             )}
           </>
         ) : (
