@@ -1,21 +1,52 @@
-# WFH Attendance
+<p align="center">
+  <img src="docs/banner.png" alt="Hearthroll – work-from-home attendance" width="100%">
+</p>
 
-![CI](https://github.com/rigelra15/wfh-attendance/actions/workflows/ci.yml/badge.svg)
+<h1 align="center">Hearthroll</h1>
 
-A web app where employees log in and check in for WFH with a live camera photo,
-their GPS location and a short note about today's agenda, and HRD manages employee data and monitors attendance
-(view only).
+<p align="center">
+  Work-from-home attendance: employees check in and out with a live photo and GPS location,<br>
+  HRD manages employees and monitors attendance.
+</p>
 
-![HRD attendance detail](docs/screenshots/hrd-attendance-detail.png)
+<p align="center">
+  <a href="https://github.com/rigelra15/wfh-attendance/actions/workflows/ci.yml"><img src="https://github.com/rigelra15/wfh-attendance/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <img src="https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=white" alt="React">
+  <img src="https://img.shields.io/badge/NestJS-12-E0234E?logo=nestjs&logoColor=white" alt="NestJS">
+  <img src="https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white" alt="TypeScript">
+  <img src="https://img.shields.io/badge/MySQL-8.4-4479A1?logo=mysql&logoColor=white" alt="MySQL">
+  <img src="https://img.shields.io/badge/OpenAPI-Swagger-85EA2D?logo=swagger&logoColor=black" alt="Swagger">
+</p>
 
-More screenshots are in [Screenshots](#screenshots).
+The name comes from **hearth** (home) + **roll call** (attendance).
+
+## Contents
+
+- [Highlights](#highlights)
+- [Tech stack](#tech-stack) · [Architecture](#architecture)
+- [Setup](#setup) · [Running the app](#running-the-app)
+- [Features](#features) · [Pages](#pages)
+- [API](#api) · [Database](#database) · [Configuration](#configuration)
+- [Security notes](#security-notes) · [Design decisions](#design-decisions)
+- [Known limitations and next steps](#known-limitations-and-next-steps)
+- [Screenshots](#screenshots)
+
+## Highlights
+
+| | |
+| --- | --- |
+| <img src="docs/screenshots/employee-check-in.png" alt="Employee check-in"> | **Check in and check out.** GPS location, a live camera photo and today's agenda. The server sets the time (WIB), one check-in per day. Check out at the end of the day to record work hours. |
+| <img src="docs/screenshots/hrd-attendance.png" alt="HRD attendance list"> | **HRD monitoring.** Search, filter by department and date, check-in / check-out times, pagination, and a team calendar. |
+| <img src="docs/screenshots/hrd-attendance-detail.png" alt="Attendance detail"> | **Proof per check-in.** Photo, agenda, map with street address, work duration and how the photo was taken. |
+| <img src="docs/screenshots/hrd-employees.png" alt="Employee management"> | **Employee management.** Add, edit, deactivate, reactivate and delete. The employee code and work email are filled in automatically. |
+| <img src="docs/screenshots/account.png" alt="Account page"> | **Secure sessions.** Short-lived access token in memory, rotating refresh token in an httpOnly cookie, server-side logout and change password. |
 
 ## Tech stack
 
-- **Frontend:** React + TypeScript + Vite, React Router, MapLibre GL JS (`apps/web`)
+- **Frontend:** React + TypeScript + Vite, React Router, MapLibre GL JS, lucide icons (`apps/web`)
 - **Backend:** 2 NestJS services (TypeScript)
-  - `apps/employee-service` – login (JWT), employee master data
-  - `apps/attendance-service` – check-in (photo + GPS), attendance history
+  - `apps/employee-service` – login, refresh token, logout, change password, employee master data
+  - `apps/attendance-service` – check-in (photo + GPS), check-out, attendance history
 - **Database:** MySQL 8.4 (Docker), TypeORM migrations
 - **Password hashing:** Argon2id
 - **API docs:** Swagger (OpenAPI) on both services
@@ -75,8 +106,8 @@ After this the database is empty. Create accounts with **one** of these options.
 npm run seed
 ```
 
-Creates one HRD and one employee account. The emails and passwords are
-generated randomly and saved in `docker/secrets/demo-accounts.json`. Open that
+Creates one HRD and one employee account (for example
+`hrd.demo@dexagroup.com`). The passwords are generated randomly and saved in `docker/secrets/demo-accounts.json`. Open that
 file to see them.
 
 ### Option B – real accounts (empty database)
@@ -132,21 +163,33 @@ npm run check:login
 - Only one check-in per day (Asia/Jakarta date). This is also enforced by a
   unique index in the database
 - After check-in, the employee sees their own photo, agenda and location
+- **Check-out** at the end of the day (once, after confirming in a modal).
+  The page then shows the check-in time, check-out time and hours worked
 - Attendance history, with a detail page for each check-in (photo, agenda, map)
 - Monthly calendar: checked-in days are green, missed work days red,
   weekends grey (see "Attendance calendar" below)
 
+**Everyone**
+- **Account** page to change the password (current password required).
+  Other devices where the user is logged in are logged out
+- Logging out also ends the session on the server
+
 **HRD**
 - Overview: active employees, who checked in today (with their agenda), and who has not
 - Add, view, and update employees. On "Add employee" the next free code
-  (`EMP-0001`, `EMP-0002`, ...) is filled in automatically and can still be changed
+  (`EMP-0001`, `EMP-0002`, ...) is filled in automatically, and the work email
+  is made from the full name (`Budi Santoso` → `budi.santoso@dexagroup.com`).
+  Both can still be changed
+- Employee and attendance lists are split into pages (10 / 20 rows), and go
+  back to page 1 when a filter changes
 - Deactivate / reactivate employees, and permanently delete an employee that
   has no attendance (see "Delete" below). Every one of these actions asks for
   confirmation in a modal first
-- Monitor all attendance: search by name or code, filter by department and date
+- Monitor all attendance: search by name or code, filter by department and date.
+  The list shows check-in and check-out time ("Not checked out" until then)
 - Calendar view: per day, how many employees checked in (e.g. `2/3`), or
   checked in / absent for one selected employee. Click a day to open it
-- Attendance detail: photo, check-in info, agenda and a map of the location
+- Attendance detail: photo, check-in / check-out time, work duration, agenda and a map of the location
   (MapLibre GL JS with the free OpenFreeMap Positron style, no API key needed,
   plus a link to Google Maps)
 - Every map also shows the street address of the coordinates (reverse
@@ -166,10 +209,23 @@ npm run check:login
 | `/hrd/employees/:id/edit` | HRD      | Edit employee                      |
 | `/hrd/attendance`         | HRD      | Attendance list with filters       |
 | `/hrd/attendance/:id`     | HRD      | Attendance detail (photo + map)    |
+| `/account`                | everyone | Change password                    |
 
-The login session is kept in `sessionStorage`, so it survives a page refresh
-but is cleared when the tab is closed. When the token expires (30 min) the
-user is sent back to the login page.
+### Login session
+
+- `POST /auth/login` returns a short **access token** (JWT, 15 minutes) in the
+  JSON body and sets a **refresh token** in an `httpOnly`, `SameSite=Strict`
+  cookie (7 days).
+- The web app keeps the access token **only in memory** (not in
+  `localStorage` / `sessionStorage`), so a script injected into the page cannot
+  steal a long-lived token.
+- When a request gets `401`, the app calls `POST /auth/refresh` once and
+  repeats the request. Requests that fail at the same time share one refresh.
+- After a page reload the session is restored the same way.
+- Every refresh **rotates** the token: the old one stops working. If an old
+  token is used again, it was probably copied, so all sessions of that user
+  are ended.
+- Only a SHA-256 hash of each refresh token is stored (`refresh_tokens` table).
 
 ### Camera and GPS notes
 
@@ -234,7 +290,7 @@ Interactive API docs (Swagger UI), where you can also try the endpoints:
 The OpenAPI file is at `/docs-json`. Click **Authorize** and paste the
 `access_token` from `POST /auth/login` to call the protected endpoints.
 
-All endpoints except login need `Authorization: Bearer <token>`.
+All endpoints except login, refresh and logout need `Authorization: Bearer <token>`.
 
 Both services also have `GET /health` (no token needed). It returns
 `{ "status": "ok" }` when the service is running and its database answers,
@@ -244,7 +300,10 @@ or `503` when the database cannot be reached.
 
 | Method | Path             | Role | Description                    |
 | ------ | ---------------- | ---- | ------------------------------ |
-| POST   | `/auth/login`    | –    | Login, returns JWT (30 min). Max 5 tries per minute |
+| POST   | `/auth/login`    | –    | Login, returns JWT (15 min) + refresh cookie. Max 5 tries per minute |
+| POST   | `/auth/refresh`  | cookie | New access token + new refresh cookie |
+| POST   | `/auth/logout`   | cookie | Ends the session, clears the cookie |
+| POST   | `/auth/change-password` | any | `{ currentPassword, newPassword }`, logs out other devices |
 | GET    | `/auth/me`       | any  | Current user                   |
 | GET    | `/employees`     | HRD  | List employees                 |
 | GET    | `/employees/next-code` | HRD | Next free code, e.g. `EMP-0002` |
@@ -259,6 +318,7 @@ or `503` when the database cannot be reached.
 | Method | Path                     | Role            | Description                         |
 | ------ | ------------------------ | --------------- | ----------------------------------- |
 | POST   | `/attendances`           | EMPLOYEE        | Check in (multipart, see below)     |
+| POST   | `/attendances/me/check-out` | EMPLOYEE     | Check out for today (once)          |
 | GET    | `/attendances/me`        | EMPLOYEE        | Own attendance history              |
 | GET    | `/attendances`           | HRD             | All attendance (`?employeeId=` filter) |
 | GET    | `/attendances/:id`       | HRD / owner     | Attendance detail                   |
@@ -281,12 +341,14 @@ or `503` when the database cannot be reached.
 - `users` – id, email (unique), password_hash, role (`EMPLOYEE` / `HRD`), created_at
 - `employees` – id, user_id (unique, FK → users), employee_code (unique),
   full_name, department, is_active
+- `refresh_tokens` – id, user_id (FK → users, cascade), token_hash (unique,
+  SHA-256), expires_at, revoked_at, created_at
 
 **attendance_db**
-- `attendances` – id, employee_id, attendance_date, checked_in_at, photo_path,
+- `attendances` – id, employee_id, attendance_date, checked_in_at, checked_out_at, photo_path,
   photo_source, latitude, longitude, location_accuracy, note, created_at.
   Unique index on (employee_id, attendance_date).
-  The location, note and photo_source columns were added by later migrations
+  The location, note, photo_source and checked_out_at columns were added by later migrations
   and are empty for check-ins made before them.
 
 `employee_id` has no foreign key because it lives in another service's
@@ -298,7 +360,7 @@ and only the file name is stored in the database.
 ```bash
 npm run build      # build all apps
 npm run lint       # lint all apps
-npm test           # unit tests (backend: login rules, employee codes, delete rules, check-in validation)
+npm test           # unit tests (backend: login, refresh tokens, change password, employee codes, delete rules, check-in / check-out)
 npm run db:down    # stop MySQL (data is kept in the Docker volume)
 ```
 
@@ -328,6 +390,7 @@ Defaults work for local development. These environment variables can override th
 | `EMPLOYEE_API_URL`      | web (Vite proxy)   | `http://127.0.0.1:3000`                    |
 | `ATTENDANCE_API_URL`    | web (Vite proxy)   | `http://127.0.0.1:3001`                    |
 | `API_BASE_PATH`         | both services      | `/` (path used by Swagger "Try it out" when the API is behind a proxy) |
+| `COOKIE_SECURE`         | employee-service   | `false` (set `true` when served over HTTPS) |
 
 ## Security notes
 
@@ -337,6 +400,10 @@ Defaults work for local development. These environment variables can override th
 - A wrong email and a wrong password get the same error, and take about the same
   time (an unknown email is still checked against a dummy hash), so the login
   does not reveal which emails exist.
+- Sessions: 15-minute access token kept in memory, refresh token in an
+  httpOnly `SameSite=Strict` cookie, stored hashed, rotated on every use, with
+  reuse detection. Logout and password change end sessions on the server.
+- Changing the password needs the current password and is rate limited per user.
 - Secrets are read from files in `docker/secrets/`, not hard-coded or committed.
 - MySQL is only exposed on `127.0.0.1`.
 - Each service uses its own DB user that only has access to its own database.
@@ -361,10 +428,12 @@ Defaults work for local development. These environment variables can override th
 
 ## Known limitations and next steps
 
-- No check-out time, shifts or late rules yet. Only one check-in per day.
+- No shifts or late rules yet. One check-in and one check-out per day.
 - Public holidays are not known, so the calendar shows them as absent.
-- The login session is a 30-minute access token in `sessionStorage`. There is
-  no refresh token or server-side logout.
+- An access token that was already issued stays valid until it expires
+  (max 15 minutes), even after logout or a password change.
+- There is no "forgot password" flow (it needs email sending), and HRD
+  cannot reset an employee's password from the UI yet.
 - Camera and GPS come from the browser, so a virtual camera or a fake GPS app
   can still be used. Uploaded photos keep their EXIF metadata.
 - Photos are stored on the local disk. A real deployment would use object
@@ -380,4 +449,5 @@ The data in these screenshots is demo data, and the photos are placeholders.
 | ![Login](docs/screenshots/login.png) Login | ![Employee check-in](docs/screenshots/employee-check-in.png) Employee: today's check-in |
 | ![Employee history](docs/screenshots/employee-history.png) Employee: attendance calendar | ![HRD overview](docs/screenshots/hrd-overview.png) HRD: overview |
 | ![HRD employees](docs/screenshots/hrd-employees.png) HRD: employees | ![HRD attendance](docs/screenshots/hrd-attendance.png) HRD: attendance list |
-| ![HRD calendar](docs/screenshots/hrd-calendar.png) HRD: team calendar | ![Swagger](docs/screenshots/swagger.png) API docs (Swagger) |
+| ![HRD calendar](docs/screenshots/hrd-calendar.png) HRD: team calendar | ![Attendance detail](docs/screenshots/hrd-attendance-detail.png) HRD: attendance detail |
+| ![Account](docs/screenshots/account.png) Account: change password | ![Swagger](docs/screenshots/swagger.png) API docs (Swagger) |
