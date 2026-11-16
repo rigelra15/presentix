@@ -1,11 +1,14 @@
 import { Body, Controller, Get, Header, Param, ParseIntPipe, Post, Query, Req, UploadedFile, UseGuards, UseInterceptors } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
 import { memoryStorage } from "multer";
+import { ApiBearerAuth, ApiBody, ApiConsumes, ApiQuery, ApiTags } from "@nestjs/swagger";
 
 import { AttendancesService } from "./attendances.service.js";
 import { AttendanceAuthGuard } from "../auth/attendance-auth.guard.js";
 import type { AuthenticatedRequest } from "../auth/attendance-auth.guard.js";
 
+@ApiTags('attendances')
+@ApiBearerAuth()
 @Controller('attendances')
 @UseGuards(AttendanceAuthGuard)
 export class AttendancesController {
@@ -28,6 +31,21 @@ export class AttendancesController {
       },
     }),
   )
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['photo', 'latitude', 'longitude', 'note', 'photoSource'],
+      properties: {
+        photo: { type: 'string', format: 'binary', description: 'JPEG or PNG, max 5 MB' },
+        latitude: { type: 'number', example: -6.175392 },
+        longitude: { type: 'number', example: 106.827153 },
+        accuracy: { type: 'number', example: 18, description: 'GPS accuracy in meters' },
+        note: { type: 'string', example: 'Finish the monthly report', description: '3 to 500 characters' },
+        photoSource: { type: 'string', enum: ['CAMERA', 'UPLOAD'] },
+      },
+    },
+  })
   create(
     @Req() request: AuthenticatedRequest,
     @Body() body: Record<string, string>,
@@ -42,6 +60,7 @@ export class AttendancesController {
   }
 
   @Get()
+  @ApiQuery({ name: 'employeeId', required: false, type: Number })
   findAll(
     @Req() request: AuthenticatedRequest,
     // Optional filter, e.g. /attendances?employeeId=5
