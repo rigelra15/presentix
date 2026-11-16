@@ -9,6 +9,7 @@ import {
   type PhotoSource
 } from '../../lib/api'
 import { useSession } from '../../lib/auth-context'
+import type { FaceCheckResult } from '../../lib/face-check'
 import { formatDate, formatDuration, formatTime, getWibToday } from '../../lib/format'
 import { Alert, Loading, PageHeader } from '../../components/ui'
 import CameraCapture from '../../components/CameraCapture'
@@ -47,6 +48,9 @@ export default function CheckInPage() {
 
   const [photo, setPhoto] = useState<Blob | null>(null)
   const [photoSource, setPhotoSource] = useState<PhotoSource>('CAMERA')
+  const [faceCheck, setFaceCheck] = useState<FaceCheckResult | null>(null)
+  // Changing the key resets the camera, used when the face check must be done again
+  const [cameraKey, setCameraKey] = useState(0)
   const [note, setNote] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
@@ -103,10 +107,19 @@ export default function CheckInPage() {
     setSubmitError('')
 
     try {
-      const record = await submitCheckIn(token, photo, photoSource, location, note.trim())
+      const record = await submitCheckIn(token, photo, photoSource, location, note.trim(), faceCheck)
       setTodayRecord(record)
     } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : 'Check-in failed')
+      const message = err instanceof Error ? err.message : 'Check-in failed'
+      setSubmitError(message)
+
+      // A face check can be used once. When the server rejects it,
+      // clear the photo so the employee takes a new one.
+      if (/face check/i.test(message)) {
+        setPhoto(null)
+        setFaceCheck(null)
+        setCameraKey(key => key + 1)
+      }
     } finally {
       setSubmitting(false)
     }
@@ -198,7 +211,12 @@ export default function CheckInPage() {
         <div className="detail-grid">
           <section className="card">
             <h3 className="card-title">My photo</h3>
-            <ProtectedPhoto key={todayRecord.id} token={token} attendanceId={todayRecord.id} />
+            <ProtectedPhoto
+              key={todayRecord.id}
+              token={token}
+              path={`/api/attendance/attendances/${todayRecord.id}/photo`}
+              alt="My check-in photo"
+            />
           </section>
 
           <div className="detail-side">
@@ -231,7 +249,7 @@ export default function CheckInPage() {
     <>
       <PageHeader
         title="WFH Check-in"
-        description="Share your location and take a live photo to record today's attendance."
+        description="Share your location, pass a short face check and write your agenda to record today's attendance."
       />
 
       <div className="checkin-date card">
@@ -286,14 +304,16 @@ export default function CheckInPage() {
             <span className={`step-number ${photo ? 'done' : ''}`}>2</span>
             <div>
               <h3>Live photo</h3>
-              <p>Take a photo of yourself at your workplace.</p>
+              <p>A short face check, then a photo of you at your workplace.</p>
             </div>
           </div>
 
           <CameraCapture
-            onChange={(newPhoto, source) => {
+            key={cameraKey}
+            onChange={(newPhoto, source, newFaceCheck) => {
               setPhoto(newPhoto)
               setPhotoSource(source)
+              setFaceCheck(newFaceCheck)
             }}
             disabled={submitting}
           />

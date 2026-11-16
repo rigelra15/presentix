@@ -6,6 +6,7 @@ import { useSession } from '../../lib/auth-context'
 import { EMAIL_DOMAIN, suggestEmail } from '../../lib/brand'
 import { Alert, Loading, PageHeader, StatusBadge } from '../../components/ui'
 import EmployeeActionDialog, { type EmployeeAction } from '../../components/EmployeeActionDialog'
+import EmployeePhotoCard from '../../components/EmployeePhotoCard'
 
 interface EmployeeForm {
   fullName: string
@@ -305,7 +306,18 @@ export default function EmployeeFormPage() {
         </div>
       </form>
 
-      {/* Status and delete live outside the form so they are not "saved" with it */}
+      {/* Photo, status and delete live outside the form so they are not "saved" with it */}
+      {employee && (
+        <EmployeePhotoCard
+          token={token}
+          employee={employee}
+          onUploaded={updated => {
+            setEmployee(updated)
+            setNotice('The profile photo has been updated.')
+          }}
+        />
+      )}
+
       {employee && (
         <section className="card form-section-card danger-zone">
           <div className="form-section-head">

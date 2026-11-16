@@ -1,19 +1,31 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException, ServiceUnavailableException } from "@nestjs/common";
+import { BadRequestException, ConflictException, Injectable, NotFoundException, ServiceUnavailableException, StreamableFile } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { DataSource, QueryFailedError } from "typeorm";
 import type { Repository } from "typeorm";
 import * as argon2 from 'argon2';
+import { randomUUID } from 'node:crypto';
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { join, resolve } from 'node:path';
 
 import { Employee } from "./entities/employee.entity.js";
 import { User } from "../users/entities/user.entity.js";
 import { UserRole } from "../users/user-role.enum.js";
 import type { CreateEmployeeDto } from "./dto/create-employee.dto.js";
 import type { UpdateEmployeeDto } from "./dto/update-employee.dto.js";
+import { getImageExtension } from "./image-type.js";
+
+// Saved photos always get a random name like this, so a value from the
+// database can never point to another folder.
+const PHOTO_NAME = /^[0-9a-f-]{36}\.(jpg|png)$/;
 
 @Injectable()
 export class EmployeesService {
   private readonly attendanceServiceUrl =
     process.env.ATTENDANCE_SERVICE_URL ?? 'http://127.0.0.1:3001';
+
+  private readonly photoDir =
+    process.env.EMPLOYEE_PHOTO_DIR ??
+    resolve(process.cwd(), '../../storage/employee-photos');
 
   constructor(
     @InjectRepository(Employee)
@@ -28,6 +40,7 @@ export class EmployeesService {
       fullName: employee.fullName,
       department: employee.department,
       isActive: employee.isActive,
+      hasPhoto: employee.photoPath !== null,
       email: employee.user.email,
       // Account creation time = the employee's first day in the system
       createdAt: employee.user.createdAt,
@@ -250,6 +263,8 @@ export class EmployeesService {
       await manager.delete(User, { id: employee.user.id });
     });
 
+    await this.removePhotoFile(employee.photoPath);
+
     return { id, deleted: true };
   }
 
@@ -264,5 +279,81 @@ export class EmployeesService {
     }
 
     return this.findOne(id);
+  }
+
+  // HRD uploads a profile photo. It replaces the old one.
+  async setPhoto(id: number, file: Express.Multer.File | undefined) {
+    const employee = await this.employees.findOne({
+      where: { id },
+      relations: { user: true },
+    });
+
+    if (!employee) {
+      throw new NotFoundException('Employee not found');
+    }
+
+    const extension = file ? getImageExtension(file) : null;
+
+    if (!file || !extension) {
+      throw new BadRequestException('Please upload a JPEG or PNG photo.');
+    }
+
+    await mkdir(this.photoDir, { recursive: true, mode: 0o700 });
+
+    const filename = `${randomUUID()}.${extension}`;
+    await writeFile(join(this.photoDir, filename), file.buffer, {
+      flag: 'wx',
+      mode: 0o600,
+    });
+
+    try {
+      await this.employees.update({ id }, { photoPath: filename });
+    } catch (error) {
+      // Do not keep a file that nothing points to
+      await this.removePhotoFile(filename);
+      throw error;
+    }
+
+    await this.removePhotoFile(employee.photoPath);
+
+    employee.photoPath = filename;
+    return this.toResponse(employee);
+  }
+
+  async getPhoto(id: number) {
+    const employee = await this.employees.findOne({
+      where: { id },
+      select: { id: true, photoPath: true },
+    });
+
+    const filename = employee?.photoPath;
+
+    if (!filename || !PHOTO_NAME.test(filename)) {
+      throw new NotFoundException('Photo not found');
+    }
+
+    let content: Buffer;
+
+    try {
+      content = await readFile(join(this.photoDir, filename));
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+        throw new NotFoundException('Photo not found');
+      }
+
+      throw error;
+    }
+
+    return new StreamableFile(content, {
+      type: filename.endsWith('.png') ? 'image/png' : 'image/jpeg',
+      disposition: 'inline',
+    });
+  }
+
+  // A missing old file is not a problem, so errors are ignored
+  private async removePhotoFile(filename: string | null) {
+    if (!filename || !PHOTO_NAME.test(filename)) return;
+
+    await rm(join(this.photoDir, filename), { force: true }).catch(() => undefined);
   }
 }

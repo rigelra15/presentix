@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { ArrowLeft, MapPinOff } from 'lucide-react'
+import { ArrowLeft, MapPinOff, UserRound } from 'lucide-react'
 import { api, type Attendance, type Employee } from '../../lib/api'
 import { useSession } from '../../lib/auth-context'
 import { formatDate, formatDuration, formatTime } from '../../lib/format'
@@ -49,6 +49,8 @@ export default function AttendanceDetailPage() {
     return <Loading />
   }
 
+  const photoBase = `/api/attendance/attendances/${record?.id}`
+
   return (
     <>
       <Link to={backTo} className="back-link">
@@ -67,8 +69,55 @@ export default function AttendanceDetailPage() {
 
           <div className="detail-grid">
             <section className="card">
-              <h3 className="card-title">Photo</h3>
-              <ProtectedPhoto key={record.id} token={token} attendanceId={record.id} />
+              <div className="card-title-row">
+                <h3 className="card-title">Photos</h3>
+                <FaceCheckBadge record={record} />
+              </div>
+
+              {isHrd ? (
+                // HRD compares the profile photo with today's photo
+                <div className="photo-compare">
+                  <figure>
+                    {employee?.hasPhoto ? (
+                      <ProtectedPhoto
+                        token={token}
+                        path={`/api/employee/employees/${record.employeeId}/photo`}
+                        alt="Profile photo"
+                      />
+                    ) : (
+                      <div className="photo-box photo-empty">
+                        <UserRound size={28} />
+                        <span>No profile photo</span>
+                      </div>
+                    )}
+                    <figcaption>Profile photo</figcaption>
+                  </figure>
+                  <figure>
+                    <ProtectedPhoto
+                      key={record.id}
+                      token={token}
+                      path={`${photoBase}/photo`}
+                      alt="Check-in photo"
+                    />
+                    <figcaption>Check-in photo</figcaption>
+                  </figure>
+                </div>
+              ) : (
+                <ProtectedPhoto key={record.id} token={token} path={`${photoBase}/photo`} alt="Check-in photo" />
+              )}
+
+              {record.livenessChecked && (
+                <div className="face-check-frames">
+                  <figure>
+                    <ProtectedPhoto token={token} path={`${photoBase}/liveness/left`} alt="Head turned left" />
+                    <figcaption>Turned left</figcaption>
+                  </figure>
+                  <figure>
+                    <ProtectedPhoto token={token} path={`${photoBase}/liveness/right`} alt="Head turned right" />
+                    <figcaption>Turned right</figcaption>
+                  </figure>
+                </div>
+              )}
             </section>
 
             <div className="detail-side">
@@ -140,4 +189,17 @@ export default function AttendanceDetailPage() {
       )}
     </>
   )
+}
+
+// Shows if the employee passed the head-turn face check
+function FaceCheckBadge({ record }: { record: Attendance }) {
+  if (record.livenessChecked) {
+    return <span className="badge badge-success">Face check passed</span>
+  }
+
+  if (record.photoSource === 'UPLOAD') {
+    return <span className="badge badge-warning">No face check (uploaded)</span>
+  }
+
+  return <span className="badge badge-muted">No face check</span>
 }

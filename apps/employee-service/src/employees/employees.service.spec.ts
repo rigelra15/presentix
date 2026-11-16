@@ -106,3 +106,72 @@ describe('EmployeesService.remove', () => {
     expect(deleted).toEqual(['Employee', 'User']);
   });
 });
+
+describe('EmployeesService profile photo', () => {
+  let photoDir: string;
+  let saved: { photoPath: string | null };
+
+  function photoFile(bytes: number[], mimetype: string) {
+    return { buffer: Buffer.from(bytes), mimetype } as Express.Multer.File;
+  }
+
+  const jpeg = photoFile([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3], 'image/jpeg');
+
+  function createPhotoService(employee: { photoPath: string | null } | null) {
+    const repository = {
+      findOne: async () => employee && { id: 1, isActive: true, user: { email: 'a@b.c' }, ...employee },
+      update: async (_where: object, values: { photoPath: string }) => {
+        saved = values;
+      },
+    } as unknown as Repository<Employee>;
+
+    return new EmployeesService(repository, {} as DataSource);
+  }
+
+  beforeEach(async () => {
+    const { mkdtemp } = await import('node:fs/promises');
+    const { tmpdir } = await import('node:os');
+    photoDir = await mkdtemp(`${tmpdir()}/employee-photos-`);
+    process.env.EMPLOYEE_PHOTO_DIR = photoDir;
+    saved = { photoPath: null };
+  });
+
+  afterEach(async () => {
+    const { rm } = await import('node:fs/promises');
+    await rm(photoDir, { recursive: true, force: true });
+    delete process.env.EMPLOYEE_PHOTO_DIR;
+  });
+
+  it('saves a JPEG with a random name and removes the old photo', async () => {
+    const { readdir, writeFile } = await import('node:fs/promises');
+    const oldName = '11111111-1111-1111-1111-111111111111.jpg';
+    await writeFile(`${photoDir}/${oldName}`, 'old');
+
+    const service = createPhotoService({ photoPath: oldName });
+    const result = await service.setPhoto(1, jpeg);
+
+    expect(result.hasPhoto).toBe(true);
+    expect(saved.photoPath).toMatch(/^[0-9a-f-]{36}\.jpg$/);
+    expect(await readdir(photoDir)).toEqual([saved.photoPath]);
+  });
+
+  it('refuses files that are not JPEG or PNG', async () => {
+    const service = createPhotoService({ photoPath: null });
+    const fakeJpeg = photoFile([0x3c, 0x73, 0x76, 0x67], 'image/jpeg');
+
+    await expect(service.setPhoto(1, fakeJpeg)).rejects.toThrow('JPEG or PNG');
+    await expect(service.setPhoto(1, undefined)).rejects.toThrow('JPEG or PNG');
+  });
+
+  it('returns 404 when the employee has no photo', async () => {
+    const service = createPhotoService({ photoPath: null });
+
+    await expect(service.getPhoto(1)).rejects.toThrow('Photo not found');
+  });
+
+  it('never reads a stored name outside the photo folder', async () => {
+    const service = createPhotoService({ photoPath: '../../etc/passwd' });
+
+    await expect(service.getPhoto(1)).rejects.toThrow('Photo not found');
+  });
+});

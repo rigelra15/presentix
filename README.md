@@ -198,10 +198,13 @@ npm run check:login
 - WFH check-in in 3 steps:
   1. **GPS location** from the browser (required, the API rejects a check-in
      without valid coordinates)
-  2. **Live photo** taken with the device camera. Only if the camera cannot
-     be used (no camera, permission denied, old browser) the employee can
-     upload a JPEG/PNG file instead. HRD sees which way was used
-     ("Live camera" or "Uploaded file")
+  2. **Face check + live photo** with the device camera. The employee turns
+     the head left and right in a random order picked by the server, then
+     looks at the camera and the photo is taken automatically (see
+     "Face check" below). Only if the camera or the face check cannot be used
+     (no camera, permission denied, old browser) the employee can upload a
+     JPEG/PNG file instead. HRD sees which way was used
+     ("Face check passed", "Live camera" or "Uploaded file")
   3. **Today's agenda**: a short note (3–500 characters) about what the
      employee works on today. HRD can read it
 - Date and time are taken from the server, not from the browser
@@ -239,6 +242,13 @@ npm run check:login
   plus a link to Google Maps)
 - Every map also shows the street address of the coordinates (reverse
   geocoding, see below)
+- **Profile photo** per employee (uploaded by HRD on the edit page). The
+  attendance detail shows it next to the check-in photo and the two face
+  check photos (head turned left / right), so HRD can see that the right
+  person checked in
+- **Export CSV**: one month of check-ins (name, code, department, times,
+  work duration, photo source, face check, GPS, agenda). Uses the current
+  search and department filter. Opens in Excel and Google Sheets
 
 ### Pages
 
@@ -280,8 +290,42 @@ npm run check:login
 - Live photos and GPS make cheating harder for normal users, but a
   determined user could still use a virtual camera or a fake GPS app. The
   server records its own time and stores the GPS accuracy so HRD can spot
-  unusual check-ins. Stronger checks (e.g. office geofencing, face matching)
+  unusual check-ins. The face check (above) blocks simple photo tricks.
+  Stronger checks (e.g. office geofencing, automatic face matching)
   are out of scope for this project.
+
+### Face check (liveness)
+
+A printed photo or a photo on another phone cannot turn its head, so the
+camera check-in asks for a short head movement first:
+
+1. The browser asks `POST /attendances/liveness-challenge`. The server picks
+   the order (`LEFT, RIGHT` or `RIGHT, LEFT`) and returns a one-time
+   `challengeId`.
+2. The web app runs [MediaPipe Face Landmarker](https://ai.google.dev/edge/mediapipe/solutions/vision/face_landmarker)
+   in the browser. It finds the nose and the sides of the face, and from the
+   nose position works out whether the head is turned left, right or straight.
+   The library and model (~10 MB) are only downloaded on the check-in step.
+3. When the head is held in the asked direction for a few frames, a small
+   photo is saved. At the end the employee looks straight at the camera and
+   the main photo is taken.
+4. The check-in sends the main photo, both head-turn photos and the
+   `challengeId`. The server only accepts it when the challenge belongs to
+   this employee, is used once, is between 1.5 seconds and 10 minutes old,
+   and the three photos are different files.
+
+HRD sees "Face check passed" in the list and the two head-turn photos on the
+detail page.
+
+This is a **basic** liveness check, not a guarantee. The face detection runs
+in the browser, so a skilled user could change the web app or play a video.
+The random order, the one-time challenge and the saved head-turn photos make
+cheating harder and easier to spot for HRD. There is **no automatic face
+matching**: HRD compares the profile photo with the check-in photos by eye.
+Automatic matching would need a server-side face recognition model (or a
+paid API), and face templates are biometric data, which is "specific personal
+data" under Indonesia's Personal Data Protection Law (UU 27/2022) and needs
+extra consent and protection.
 
 ### Attendance calendar
 
@@ -355,6 +399,8 @@ or `503` when the database cannot be reached.
 | GET    | `/employees/:id` | HRD  | Employee detail                |
 | POST   | `/employees`     | HRD  | Create employee + login account |
 | PATCH  | `/employees/:id` | HRD  | Update / reactivate employee   |
+| PUT    | `/employees/:id/photo` | HRD | Upload / replace profile photo (multipart `photo`, JPEG/PNG, max 5 MB) |
+| GET    | `/employees/:id/photo` | HRD | Profile photo                  |
 | DELETE | `/employees/:id` | HRD  | Deactivate employee            |
 | DELETE | `/employees/:id/permanent` | HRD | Delete employee for good (see above) |
 
@@ -362,12 +408,14 @@ or `503` when the database cannot be reached.
 
 | Method | Path                     | Role            | Description                         |
 | ------ | ------------------------ | --------------- | ----------------------------------- |
+| POST   | `/attendances/liveness-challenge` | EMPLOYEE | Start a face check, returns `{ challengeId, steps, expiresAt }` |
 | POST   | `/attendances`           | EMPLOYEE        | Check in (multipart, see below)     |
 | POST   | `/attendances/me/check-out` | EMPLOYEE     | Check out for today (once)          |
 | GET    | `/attendances/me`        | EMPLOYEE        | Own attendance history              |
 | GET    | `/attendances`           | HRD             | All attendance (`?employeeId=` filter) |
 | GET    | `/attendances/:id`       | HRD / owner     | Attendance detail                   |
 | GET    | `/attendances/:id/photo` | HRD / owner     | Check-in photo                      |
+| GET    | `/attendances/:id/liveness/left` or `/right` | HRD / owner | Face check photo |
 
 `POST /attendances` is `multipart/form-data` with these fields:
 
@@ -379,33 +427,39 @@ or `503` when the database cannot be reached.
 | `note`      | text, 3 to 500 characters          |
 | `photoSource` | `CAMERA` or `UPLOAD` (label set by the browser) |
 | `photo`     | JPEG or PNG, max 5 MB              |
+| `challengeId` | required for `CAMERA`, from `/attendances/liveness-challenge` |
+| `livenessLeft`, `livenessRight` | required for `CAMERA`: head turned left / right, JPEG or PNG |
+
+The response has `livenessChecked: true` when the face check was passed.
 
 ## Database
 
 **employee_db**
 - `users` – id, email (unique), password_hash, role (`EMPLOYEE` / `HRD`), created_at
 - `employees` – id, user_id (unique, FK → users), employee_code (unique),
-  full_name, department, is_active
+  full_name, department, is_active, photo_path (profile photo, added later)
 - `refresh_tokens` – id, user_id (FK → users, cascade), token_hash (unique,
   SHA-256), expires_at, revoked_at, created_at
 
 **attendance_db**
 - `attendances` – id, employee_id, attendance_date, checked_in_at, checked_out_at, photo_path,
-  photo_source, latitude, longitude, location_accuracy, note, created_at.
+  photo_source, latitude, longitude, location_accuracy, note,
+  liveness_left_path, liveness_right_path, created_at.
   Unique index on (employee_id, attendance_date).
-  The location, note, photo_source and checked_out_at columns were added by later migrations
+  The location, note, photo_source, checked_out_at and liveness columns were added by later migrations
   and are empty for check-ins made before them.
 
 `employee_id` has no foreign key because it lives in another service's
-database. Photos are saved on disk in `storage/attendance-photos/` (git-ignored),
-and only the file name is stored in the database.
+database. Photos are saved on disk in `storage/attendance-photos/` and
+`storage/employee-photos/` (git-ignored), and only the file name is stored in
+the database.
 
 ## Useful commands
 
 ```bash
 npm run build      # build all apps
 npm run lint       # lint all apps
-npm test           # unit tests (backend: login, refresh tokens, change password, employee codes, delete rules, check-in / check-out)
+npm test           # unit tests (backend: login, refresh tokens, change password, employee codes, delete rules, profile photo, check-in / check-out, face check)
 npm run db:down    # stop MySQL (data is kept in the Docker volume)
 npm run stack:up   # Docker: build and start everything (http://localhost:8080)
 npm run stack:down # Docker: stop everything (data is kept)
@@ -434,6 +488,7 @@ Defaults work for local development. These environment variables can override th
 | `EMPLOYEE_SERVICE_URL`  | attendance-service | `http://127.0.0.1:3000`                    |
 | `ATTENDANCE_SERVICE_URL` | employee-service  | `http://127.0.0.1:3001`                    |
 | `ATTENDANCE_PHOTO_DIR`  | attendance-service | `storage/attendance-photos`                |
+| `EMPLOYEE_PHOTO_DIR`    | employee-service   | `storage/employee-photos`                  |
 | `EMPLOYEE_API_URL`      | web (Vite proxy)   | `http://127.0.0.1:3000`                    |
 | `ATTENDANCE_API_URL`    | web (Vite proxy)   | `http://127.0.0.1:3001`                    |
 | `API_BASE_PATH`         | both services      | `/` (Swagger "Try it out" path, `/api/...` in Docker) |
@@ -486,7 +541,11 @@ Defaults work for local development. These environment variables can override th
 - There is no "forgot password" flow (it needs email sending), and HRD
   cannot reset an employee's password from the UI yet.
 - Camera and GPS come from the browser, so a virtual camera or a fake GPS app
-  can still be used. Uploaded photos keep their EXIF metadata.
+  can still be used. The face check runs in the browser and is not
+  deepfake-proof. Uploaded photos keep their EXIF metadata.
+- Face check challenges are kept in memory, so a restart of attendance-service
+  means an employee who was in the middle of the face check starts again.
+- No automatic face matching (see "Face check"). HRD compares photos by eye.
 - Photos are stored on the local disk. A real deployment would use object
   storage (for example S3) and HTTPS in front of nginx.
 - The login rate limit is kept in memory, so it resets when the service restarts.
