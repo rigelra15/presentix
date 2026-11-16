@@ -32,6 +32,116 @@ services:
         bind:
           create_host_path: false
 
+  # ---------------------------------------------------------------
+  # Full app in Docker. These only start with the "app" profile:
+  #   docker compose --profile app up -d --build --wait
+  # Plain "docker compose up" (npm run db:up) still starts only MySQL.
+  # ---------------------------------------------------------------
+
+  employee-service:
+    profiles: ["app"]
+    build:
+      context: .
+      dockerfile: docker/service.Dockerfile
+      args:
+        SERVICE: employee-service
+    image: wfh-attendance/employee-service
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_PASSWORD_FILE: /run/secrets/employee_db_password
+      JWT_SECRET_FILE: /run/secrets/jwt_access_secret
+      ATTENDANCE_SERVICE_URL: http://attendance-service:3001
+      API_BASE_PATH: /api/employee
+    secrets:
+      - employee_db_password
+      - jwt_access_secret
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:3000/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 15s
+
+  attendance-service:
+    profiles: ["app"]
+    build:
+      context: .
+      dockerfile: docker/service.Dockerfile
+      args:
+        SERVICE: attendance-service
+    image: wfh-attendance/attendance-service
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_PASSWORD_FILE: /run/secrets/attendance_db_password
+      EMPLOYEE_SERVICE_URL: http://employee-service:3000
+      ATTENDANCE_PHOTO_DIR: /data/attendance-photos
+      API_BASE_PATH: /api/attendance
+    secrets:
+      - attendance_db_password
+    volumes:
+      # Same folder as in local development, so photos match the database
+      - ${PHOTO_DIR:-./storage/attendance-photos}:/data/attendance-photos
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:3001/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 15s
+
+  web:
+    profiles: ["app"]
+    build:
+      context: .
+      dockerfile: docker/web.Dockerfile
+    image: wfh-attendance/web
+    restart: unless-stopped
+    depends_on:
+      employee-service:
+        condition: service_healthy
+      attendance-service:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${WEB_PORT:-8080}:80"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # One-off job that creates the demo HRD and employee accounts:
+  #   docker compose run --rm seed
+  # The passwords are saved to docker/secrets/demo-accounts.json
+  seed:
+    profiles: ["seed"]
+    image: wfh-attendance/employee-service
+    build:
+      context: .
+      dockerfile: docker/service.Dockerfile
+      args:
+        SERVICE: employee-service
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_PASSWORD_FILE: /run/secrets/employee_db_password
+    secrets:
+      - employee_db_password
+    volumes:
+      - ./docker/secrets:/app/docker/secrets
+    command: ["npm", "run", "seed"]
+
 secrets:
   mysql_root_password:
     file: ./docker/secrets/mysql_root_password
@@ -41,6 +151,9 @@ secrets:
 
   attendance_db_password:
     file: ./docker/secrets/attendance_db_password
+
+  jwt_access_secret:
+    file: ./docker/secrets/jwt_access_secret
 
 volumes:
   mysql_data:
