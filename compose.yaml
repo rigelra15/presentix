@@ -56,12 +56,16 @@ services:
       DB_PASSWORD_FILE: /run/secrets/employee_db_password
       JWT_SECRET_FILE: /run/secrets/jwt_access_secret
       ATTENDANCE_SERVICE_URL: http://attendance-service:3001
+      EMPLOYEE_PHOTO_DIR: /data/employee-photos
       API_BASE_PATH: /api/employee
       # Set to true when the app is served over HTTPS (refresh token cookie)
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
     secrets:
       - employee_db_password
       - jwt_access_secret
+    volumes:
+      # Profile photos, same folder as in local development
+      - ${PROFILE_PHOTO_DIR:-./storage/employee-photos}:/data/employee-photos
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:3000/health"]
       interval: 5s

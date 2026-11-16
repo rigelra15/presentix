@@ -495,6 +495,7 @@ Defaults work for local development. These environment variables can override th
 | `COOKIE_SECURE`         | employee-service   | `false` (set `true` when served over HTTPS) |
 | `WEB_PORT`              | docker compose     | `8080`                                     |
 | `PHOTO_DIR`             | docker compose     | `./storage/attendance-photos`              |
+| `PROFILE_PHOTO_DIR`     | docker compose     | `./storage/employee-photos` (host folder for profile photos) |
 
 ## Security notes
 
