@@ -1,6 +1,7 @@
 import { useRef, useState, type ChangeEvent } from 'react'
-import { ImageUp, UserRound } from 'lucide-react'
-import { uploadEmployeePhoto, type Employee } from '../lib/api'
+import { Clock3, ImageUp, UserRound } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { checkPhotoFile, uploadPhoto, type Employee } from '../lib/api'
 import ProtectedPhoto from './ProtectedPhoto'
 
 interface Props {
@@ -8,10 +9,6 @@ interface Props {
   employee: Employee
   onUploaded: (employee: Employee) => void
 }
-
-// Same limits as the API
-const MAX_SIZE = 5 * 1024 * 1024
-const ALLOWED_TYPES = ['image/jpeg', 'image/png']
 
 // Profile photo of an employee. HRD compares it with the check-in
 // photos to see that the right person checked in.
@@ -27,13 +24,9 @@ export default function EmployeePhotoCard({ token, employee, onUploaded }: Props
     event.target.value = ''
     if (!file) return
 
-    if (!ALLOWED_TYPES.includes(file.type)) {
-      setError('Please choose a JPEG or PNG photo.')
-      return
-    }
-
-    if (file.size > MAX_SIZE) {
-      setError('The photo is too large (max 5 MB).')
+    const problem = checkPhotoFile(file)
+    if (problem) {
+      setError(problem)
       return
     }
 
@@ -41,7 +34,7 @@ export default function EmployeePhotoCard({ token, employee, onUploaded }: Props
     setError('')
 
     try {
-      const updated = await uploadEmployeePhoto(token, employee.id, file)
+      const updated = await uploadPhoto(token, `/api/employee/employees/${employee.id}/photo`, file)
       setVersion(value => value + 1)
       onUploaded(updated)
     } catch (err) {
@@ -92,7 +85,16 @@ export default function EmployeePhotoCard({ token, employee, onUploaded }: Props
             <ImageUp size={16} />
             {uploading ? 'Uploading...' : employee.hasPhoto ? 'Replace photo' : 'Upload photo'}
           </button>
-          <small className="muted">JPEG or PNG, max 5 MB.</small>
+          <small className="muted">JPEG or PNG, max 5 MB. Uploaded by HRD, so no approval is needed.</small>
+          {employee.photoRequestAt && (
+            <p className="photo-request-note">
+              <Clock3 size={14} />
+              <span>
+                This employee sent a new photo.{' '}
+                <Link to="/hrd/employees">Review it on the Employees page</Link>.
+              </span>
+            </p>
+          )}
           {error && <p className="field-error">{error}</p>}
         </div>
       </div>

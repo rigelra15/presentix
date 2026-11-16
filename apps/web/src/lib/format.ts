@@ -62,3 +62,21 @@ export function formatDuration(from: string, to: string): string {
 
   return `${hours}h ${String(minutes % 60).padStart(2, '0')}m`
 }
+
+// ISO timestamp -> "16 Nov 2026, 10:42 WIB"
+export function formatDateTime(value: string): string {
+  const date = new Date(value)
+
+  if (Number.isNaN(date.getTime())) {
+    return '-'
+  }
+
+  const day = new Intl.DateTimeFormat('en-GB', {
+    timeZone: TIME_ZONE,
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric'
+  }).format(date)
+
+  return `${day}, ${formatTime(value)}`
+}

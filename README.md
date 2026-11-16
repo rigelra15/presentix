@@ -217,6 +217,11 @@ npm run check:login
 - Monthly calendar: checked-in days are green, missed work days red,
   weekends grey (see "Attendance calendar" below)
 
+- **Profile photo** on the Account page. The employee can send a new photo,
+  but it only replaces the current one after HRD approves it. Until then it
+  shows "Waiting for HR", and the employee can cancel it or send another one.
+  If HRD rejects it, the employee sees a message and can try again
+
 **Everyone**
 - **Account** page to change the password (current password required).
   Other devices where the user is logged in are logged out
@@ -242,10 +247,15 @@ npm run check:login
   plus a link to Google Maps)
 - Every map also shows the street address of the coordinates (reverse
   geocoding, see below)
-- **Profile photo** per employee (uploaded by HRD on the edit page). The
-  attendance detail shows it next to the check-in photo and the two face
-  check photos (head turned left / right), so HRD can see that the right
-  person checked in
+- **Profile photo** per employee. HRD can upload it on the edit page
+  (no approval needed). The attendance detail shows it next to the check-in
+  photo and the two face check photos (head turned left / right), so HRD can
+  see that the right person checked in
+- **Photo requests**: when an employee sends a new profile photo, the
+  Overview shows a banner and the Employees page shows the current and the
+  new photo side by side with **Approve** / **Reject**. An employee cannot
+  change their own photo without HRD, so nobody can quietly put another
+  person's face on an account
 - **Export CSV**: one month of check-ins (name, code, department, times,
   work duration, photo source, face check, GPS, agenda). Uses the current
   search and department filter. Opens in Excel and Google Sheets
@@ -298,6 +308,15 @@ npm run check:login
 
 A printed photo or a photo on another phone cannot turn its head, so the
 camera check-in asks for a short head movement first:
+
+<p align="center">
+  <img src="docs/face-check.gif" width="480" alt="Face check: an oval shows where to put the face, arrows show which way to turn, a bar fills while the pose is held, and each step ends with a green check">
+</p>
+<p align="center"><sub>Animated illustration of the face check guide (drawn face, real app styles).</sub></p>
+
+On the camera the employee sees an **oval** for the face (the rest of the
+picture is dimmed), **moving arrows** to the side to turn to, a **bar** that
+fills while the pose is held, and a **green check** after each step.
 
 1. The browser asks `POST /attendances/liveness-challenge`. The server picks
    the order (`LEFT, RIGHT` or `RIGHT, LEFT`) and returns a one-time
@@ -401,6 +420,19 @@ or `503` when the database cannot be reached.
 | PATCH  | `/employees/:id` | HRD  | Update / reactivate employee   |
 | PUT    | `/employees/:id/photo` | HRD | Upload / replace profile photo (multipart `photo`, JPEG/PNG, max 5 MB) |
 | GET    | `/employees/:id/photo` | HRD | Profile photo                  |
+| GET    | `/employees/photo-requests` | HRD | Employees with a new photo waiting for approval |
+| GET    | `/employees/:id/photo-request` | HRD | The new photo the employee sent |
+| POST   | `/employees/:id/photo-request/approve` | HRD | `{ submittedAt }`, the new photo becomes the profile photo |
+| POST   | `/employees/:id/photo-request/reject` | HRD | `{ submittedAt }`, the new photo is deleted |
+| GET    | `/me/profile`    | EMPLOYEE | Own employee data, incl. `hasPhoto`, `photoRequestAt`, `photoRejectedAt` |
+| GET    | `/me/photo`      | EMPLOYEE | Own approved profile photo     |
+| PUT    | `/me/photo-request` | EMPLOYEE | Send a new profile photo (multipart `photo`), waits for HRD |
+| GET    | `/me/photo-request` | EMPLOYEE | Own photo that waits for HRD |
+| DELETE | `/me/photo-request` | EMPLOYEE | Cancel the photo request     |
+
+`submittedAt` is the `photoRequestAt` value HRD looked at. If the employee
+sent a newer photo in the meantime, approve/reject answers `409` and HRD
+reviews the new one, so HRD never approves a photo they have not seen.
 | DELETE | `/employees/:id` | HRD  | Deactivate employee            |
 | DELETE | `/employees/:id/permanent` | HRD | Delete employee for good (see above) |
 
@@ -437,7 +469,9 @@ The response has `livenessChecked: true` when the face check was passed.
 **employee_db**
 - `users` – id, email (unique), password_hash, role (`EMPLOYEE` / `HRD`), created_at
 - `employees` – id, user_id (unique, FK → users), employee_code (unique),
-  full_name, department, is_active, photo_path (profile photo, added later)
+  full_name, department, is_active, photo_path (profile photo),
+  pending_photo_path, pending_photo_at, photo_rejected_at (photo requests).
+  The photo columns were added by later migrations
 - `refresh_tokens` – id, user_id (FK → users, cascade), token_hash (unique,
   SHA-256), expires_at, revoked_at, created_at
 

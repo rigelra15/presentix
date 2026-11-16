@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { CheckCircle2, Clock3, UserCheck, Users } from 'lucide-react'
+import { CheckCircle2, Clock3, ImageUp, UserCheck, Users } from 'lucide-react'
 import { api, type Attendance, type Employee } from '../../lib/api'
 import { useSession } from '../../lib/auth-context'
 import { formatDate, getWibToday } from '../../lib/format'
@@ -38,6 +38,8 @@ export default function OverviewPage() {
   const checkedInIds = new Set(todayRecords.map(r => r.employeeId))
   const notCheckedIn = activeEmployees.filter(e => !checkedInIds.has(e.id))
 
+  const photoRequests = employees.filter(e => e.photoRequestAt).length
+
   const attendanceRate = activeEmployees.length
     ? Math.round((todayRecords.length / activeEmployees.length) * 100)
     : 0
@@ -51,6 +53,17 @@ export default function OverviewPage() {
       <PageHeader title="Overview" description={`Attendance summary for ${formatDate(today)}`} />
 
       {error && <Alert type="error">{error}</Alert>}
+
+      {photoRequests > 0 && (
+        <Link to="/hrd/employees" className="review-banner">
+          <ImageUp size={18} />
+          <span>
+            <strong>{photoRequests}</strong> new profile photo{photoRequests > 1 ? 's' : ''} waiting
+            for your approval
+          </span>
+          <span className="review-banner-link">Review</span>
+        </Link>
+      )}
 
       <div className="stats-grid">
         <StatCard

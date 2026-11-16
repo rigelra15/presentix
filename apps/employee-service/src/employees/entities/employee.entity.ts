@@ -58,4 +58,30 @@ export class Employee {
     nullable: true,
   })
   photoPath!: string | null;
+
+  // New photo sent by the employee, waiting for HRD
+  @Column({
+    name: 'pending_photo_path',
+    type: 'varchar',
+    length: 100,
+    nullable: true,
+  })
+  pendingPhotoPath!: string | null;
+
+  @Column({
+    name: 'pending_photo_at',
+    type: 'datetime',
+    precision: 3,
+    nullable: true,
+  })
+  pendingPhotoAt!: Date | null;
+
+  // Set when HRD rejected the last request, so the employee can see it
+  @Column({
+    name: 'photo_rejected_at',
+    type: 'datetime',
+    precision: 3,
+    nullable: true,
+  })
+  photoRejectedAt!: Date | null;
 }

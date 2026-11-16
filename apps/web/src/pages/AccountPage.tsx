@@ -3,6 +3,7 @@ import { Eye, EyeOff, KeyRound } from 'lucide-react'
 import { api } from '../lib/api'
 import { useSession } from '../lib/auth-context'
 import { Alert, PageHeader } from '../components/ui'
+import MyPhotoCard from '../components/MyPhotoCard'
 
 // Same rules as the API (ChangePasswordDto)
 function passwordProblem(password: string): string {
@@ -66,6 +67,9 @@ export default function AccountPage() {
   return (
     <>
       <PageHeader title="Account" description={user.email} />
+
+      {/* Only employees have a profile photo */}
+      {user.role === 'EMPLOYEE' && <MyPhotoCard token={token} />}
 
       <form className="form-layout" onSubmit={handleSubmit}>
         {error && <Alert type="error">{error}</Alert>}
