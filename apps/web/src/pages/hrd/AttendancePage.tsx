@@ -198,6 +198,8 @@ export default function AttendancePage() {
                         <td>
                           {record.photoSource === 'UPLOAD' ? (
                             <span className="badge badge-warning">Uploaded</span>
+                          ) : record.livenessChecked ? (
+                            <span className="badge badge-success">Face check</span>
                           ) : record.photoSource === 'CAMERA' ? (
                             <span className="badge badge-muted">Camera</span>
                           ) : (

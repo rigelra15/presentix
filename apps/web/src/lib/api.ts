@@ -1,3 +1,5 @@
+import type { FaceCheckChallenge, FaceCheckResult } from './face-check'
+
 export type Role = 'EMPLOYEE' | 'HRD'
 
 export interface SessionUser {
@@ -23,6 +25,8 @@ export interface Employee {
   department: string
   email: string
   isActive: boolean
+  // true when HRD uploaded a profile photo
+  hasPhoto: boolean
   createdAt: string
 }
 
@@ -44,6 +48,16 @@ export interface Attendance {
   note: string | null
   // Empty for check-ins made before this was recorded
   photoSource: PhotoSource | null
+  // true when the employee passed the head-turn face check
+  livenessChecked: boolean
+}
+
+// Starts a face check. The server picks the order of the head turns.
+export function startFaceCheck(token: string): Promise<FaceCheckChallenge> {
+  return api<FaceCheckChallenge>('/api/attendance/attendances/liveness-challenge', {
+    token,
+    method: 'POST'
+  })
 }
 
 export interface CheckInLocation {
@@ -191,7 +205,9 @@ export async function submitCheckIn(
   photo: Blob,
   photoSource: PhotoSource,
   location: CheckInLocation,
-  note: string
+  note: string,
+  // Required for camera photos, empty for uploaded photos
+  faceCheck: FaceCheckResult | null
 ): Promise<Attendance> {
   // Text fields first, then the photo
   const formData = new FormData()
@@ -200,7 +216,14 @@ export async function submitCheckIn(
   formData.append('accuracy', String(Math.round(location.accuracy)))
   formData.append('note', note)
   formData.append('photoSource', photoSource)
+  if (faceCheck) {
+    formData.append('challengeId', faceCheck.challengeId)
+  }
   formData.append('photo', photo, photo.type === 'image/png' ? 'checkin.png' : 'checkin.jpg')
+  if (faceCheck) {
+    formData.append('livenessLeft', faceCheck.left, 'left.jpg')
+    formData.append('livenessRight', faceCheck.right, 'right.jpg')
+  }
 
   const response = await fetchWithToken(token, currentToken =>
     fetch('/api/attendance/attendances', {
@@ -223,12 +246,10 @@ export async function submitCheckIn(
 
 // Photos are protected, so they are loaded with the token
 // and shown with an object URL instead of a normal <img src>.
-export async function fetchPhoto(
-  token: string,
-  attendanceId: number
-): Promise<Blob> {
+// path: e.g. /api/attendance/attendances/5/photo
+export async function fetchPhoto(token: string, path: string): Promise<Blob> {
   const response = await fetchWithToken(token, currentToken =>
-    fetch(`/api/attendance/attendances/${attendanceId}/photo`, {
+    fetch(path, {
       headers: { Authorization: `Bearer ${currentToken}` },
       cache: 'no-store'
     })
@@ -238,9 +259,37 @@ export async function fetchPhoto(
     window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT))
   }
 
+  if (response.status === 404) {
+    throw new Error('No photo')
+  }
+
   if (!response.ok) {
     throw new Error(`Unable to load photo (HTTP ${response.status})`)
   }
 
   return response.blob()
+}
+
+// HRD uploads or replaces an employee's profile photo
+export async function uploadEmployeePhoto(
+  token: string,
+  employeeId: number,
+  photo: File
+): Promise<Employee> {
+  const formData = new FormData()
+  formData.append('photo', photo, photo.name)
+
+  const response = await fetchWithToken(token, currentToken =>
+    fetch(`/api/employee/employees/${employeeId}/photo`, {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${currentToken}` },
+      body: formData
+    })
+  )
+
+  if (response.status === 413) {
+    throw new Error('The photo is too large (max 5 MB).')
+  }
+
+  return handleResponse<Employee>(response, token)
 }

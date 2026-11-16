@@ -1328,6 +1328,55 @@ button.calendar-day:hover {
   font-weight: 600;
 }
 
+.photo-source-tag-ok {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(21, 128, 61, 0.9);
+}
+
+/* Instructions shown on top of the camera during the face check */
+.face-check-overlay {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  left: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 16px;
+  border-radius: var(--radius-sm);
+  background: rgba(15, 23, 42, 0.8);
+  color: #fff;
+  text-align: center;
+}
+
+.face-check-overlay strong {
+  font-size: 16px;
+}
+
+.face-check-overlay span {
+  font-size: 13px;
+  color: #fde68a;
+}
+
+.face-check-dots {
+  display: flex;
+  gap: 6px;
+}
+
+.face-check-dots span {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.face-check-dots span.done {
+  background: #4ade80;
+}
+
 .upload-hint {
   margin: 0;
   font-size: 13px;
@@ -1697,4 +1746,82 @@ button.calendar-day:hover {
   .table td {
     white-space: nowrap;
   }
+}
+
+/* Employee profile photo (edit employee page) */
+.profile-photo-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 20px;
+}
+
+.profile-photo {
+  width: 160px;
+}
+
+.profile-photo .photo-box img {
+  aspect-ratio: 1;
+  object-fit: cover;
+}
+
+.profile-photo-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.profile-photo-actions .field-error {
+  margin: 0;
+}
+
+/* Attendance detail: profile photo, check-in photo and face check photos */
+.photo-compare {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.photo-compare figure,
+.face-check-frames figure {
+  margin: 0;
+}
+
+.photo-compare figcaption,
+.face-check-frames figcaption {
+  margin-top: 6px;
+  color: var(--text-muted);
+  font-size: 13px;
+  text-align: center;
+}
+
+.photo-compare .photo-box img {
+  aspect-ratio: 3 / 4;
+  object-fit: cover;
+}
+
+.face-check-frames {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.face-check-frames .photo-box img {
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+}
+
+.card-title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.card-title-row .card-title {
+  margin: 0;
 }
