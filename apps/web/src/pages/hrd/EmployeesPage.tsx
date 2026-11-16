@@ -6,6 +6,7 @@ import { useSession } from '../../lib/auth-context'
 import { Alert, EmptyState, Loading, PageHeader, StatusBadge } from '../../components/ui'
 import EmployeeActionDialog, { type EmployeeAction } from '../../components/EmployeeActionDialog'
 import Pagination from '../../components/Pagination'
+import PhotoRequests from '../../components/PhotoRequests'
 import { usePagination } from '../../lib/use-pagination'
 
 type StatusFilter = 'all' | 'active' | 'inactive'
@@ -87,6 +88,14 @@ export default function EmployeesPage() {
 
       {notice && <Alert type="success">{notice}</Alert>}
       {error && <Alert type="error">{error}</Alert>}
+
+      <PhotoRequests
+        token={token}
+        onReviewed={(updated, message) => {
+          setEmployees(list => list.map(e => (e.id === updated.id ? updated : e)))
+          setNotice(message)
+        }}
+      />
 
       <div className="card table-card">
         <div className="toolbar">

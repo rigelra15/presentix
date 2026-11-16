@@ -25,8 +25,12 @@ export interface Employee {
   department: string
   email: string
   isActive: boolean
-  // true when HRD uploaded a profile photo
+  // true when the employee has an approved profile photo
   hasPhoto: boolean
+  // When the employee sent a new photo that waits for HRD, null = none
+  photoRequestAt: string | null
+  // When HRD rejected the last new photo, null = never or approved since
+  photoRejectedAt: string | null
   createdAt: string
 }
 
@@ -270,17 +274,26 @@ export async function fetchPhoto(token: string, path: string): Promise<Blob> {
   return response.blob()
 }
 
-// HRD uploads or replaces an employee's profile photo
-export async function uploadEmployeePhoto(
-  token: string,
-  employeeId: number,
-  photo: File
-): Promise<Employee> {
+// Same limits as the API
+const PHOTO_MAX_SIZE = 5 * 1024 * 1024
+const PHOTO_TYPES = ['image/jpeg', 'image/png']
+
+// Returns an error message, or '' when the file can be uploaded
+export function checkPhotoFile(file: File): string {
+  if (!PHOTO_TYPES.includes(file.type)) return 'Please choose a JPEG or PNG photo.'
+  if (file.size > PHOTO_MAX_SIZE) return 'The photo is too large (max 5 MB).'
+  return ''
+}
+
+// Uploads a profile photo:
+// - HRD: /api/employee/employees/:id/photo (replaces it right away)
+// - employee: /api/employee/me/photo-request (waits for HRD approval)
+export async function uploadPhoto(token: string, path: string, photo: File): Promise<Employee> {
   const formData = new FormData()
   formData.append('photo', photo, photo.name)
 
   const response = await fetchWithToken(token, currentToken =>
-    fetch(`/api/employee/employees/${employeeId}/photo`, {
+    fetch(path, {
       method: 'PUT',
       headers: { Authorization: `Bearer ${currentToken}` },
       body: formData
