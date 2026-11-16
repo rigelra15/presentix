@@ -5,8 +5,8 @@
 <h1 align="center">Presentix</h1>
 
 <p align="center">
-  Work-from-home attendance: employees check in and out with a live photo and GPS location,<br>
-  HRD manages employees and monitors attendance.
+  Work-from-home attendance: employees check in and out with a face check, a live photo and GPS location,<br>
+  HRD manages employees, approves profile photos and monitors attendance.
 </p>
 
 <p align="center">
@@ -18,7 +18,7 @@
   <img src="https://img.shields.io/badge/OpenAPI-Swagger-85EA2D?logo=swagger&logoColor=black" alt="Swagger">
 </p>
 
-The name comes from **presence**: every check-in proves an employee is present, with a live photo and their location.
+The name comes from **presence**: every check-in proves an employee is present, with a short face check, a live photo and their location.
 
 ## Contents
 
@@ -35,18 +35,20 @@ The name comes from **presence**: every check-in proves an employee is present, 
 
 | | |
 | --- | --- |
-| <img src="docs/screenshots/employee-check-in.png" alt="Employee check-in"> | **Check in and check out.** GPS location, a live camera photo and today's agenda. The server sets the time (WIB), one check-in per day. Check out at the end of the day to record work hours. |
-| <img src="docs/screenshots/hrd-attendance.png" alt="HRD attendance list"> | **HRD monitoring.** Search, filter by department and date, check-in / check-out times, pagination, and a team calendar. |
-| <img src="docs/screenshots/hrd-attendance-detail.png" alt="Attendance detail"> | **Proof per check-in.** Photo, agenda, map with street address, work duration and how the photo was taken. |
-| <img src="docs/screenshots/hrd-employees.png" alt="Employee management"> | **Employee management.** Add, edit, deactivate, reactivate and delete. The employee code and work email are filled in automatically. |
-| <img src="docs/screenshots/account.png" alt="Account page"> | **Secure sessions.** Short-lived access token in memory, rotating refresh token in an httpOnly cookie, server-side logout and change password. |
+| <img src="docs/screenshots/employee-check-in.png" alt="Employee check-in with face check"> | **Check in with a face check.** GPS location, a head turn left / right in a random order from the server, then a live camera photo and today's agenda. The server sets the time (WIB), one check-in per day. Check out at the end of the day to record work hours. |
+| <img src="docs/screenshots/hrd-attendance-detail.png" alt="Attendance detail"> | **Proof per check-in.** The profile photo next to the check-in photo and both head-turn photos, plus agenda, map with street address and work duration. |
+| <img src="docs/screenshots/hrd-attendance.png" alt="HRD attendance list"> | **HRD monitoring.** Search, filter by department and date, check-in / check-out times, "Face check" badge, pagination, a team calendar and **Export CSV** per month. |
+| <img src="docs/screenshots/hrd-employees.png" alt="Employee management"> | **Employee management.** Add, edit, deactivate, reactivate and delete. The employee code and work email are filled in automatically. New profile photos from employees wait here for **Approve / Reject**. |
+| <img src="docs/screenshots/account.png" alt="Account page"> | **Account and secure sessions.** Employees send a new profile photo for HRD approval. Short-lived access token in memory, rotating refresh token in an httpOnly cookie, server-side logout and change password. |
 
 ## Tech stack
 
-- **Frontend:** React + TypeScript + Vite, React Router, MapLibre GL JS, lucide icons (`apps/web`)
+- **Frontend:** React + TypeScript + Vite, React Router, MapLibre GL JS,
+  MediaPipe Face Landmarker (face check, runs in the browser), lucide icons (`apps/web`)
 - **Backend:** 2 NestJS services (TypeScript)
-  - `apps/employee-service` – login, refresh token, logout, change password, employee master data
-  - `apps/attendance-service` – check-in (photo + GPS), check-out, attendance history
+  - `apps/employee-service` – login, refresh token, logout, change password, employee master data,
+    profile photos and photo requests
+  - `apps/attendance-service` – face check challenge, check-in (photo + GPS), check-out, attendance history
 - **Database:** MySQL 8.4 (Docker), TypeORM migrations
 - **Password hashing:** Argon2id
 - **API docs:** Swagger (OpenAPI) on both services
@@ -216,7 +218,6 @@ npm run check:login
 - Attendance history, with a detail page for each check-in (photo, agenda, map)
 - Monthly calendar: checked-in days are green, missed work days red,
   weekends grey (see "Attendance calendar" below)
-
 - **Profile photo** on the Account page. The employee can send a new photo,
   but it only replaces the current one after HRD approves it. Until then it
   shows "Waiting for HR", and the employee can cancel it or send another one.
@@ -224,6 +225,7 @@ npm run check:login
 
 **Everyone**
 - **Account** page to change the password (current password required).
+  Employees also see their profile photo there
   Other devices where the user is logged in are logged out
 - Logging out also ends the session on the server
 
@@ -265,16 +267,16 @@ npm run check:login
 | URL                       | Who      | Page                               |
 | ------------------------- | -------- | ---------------------------------- |
 | `/login`                  | everyone | Sign in                            |
-| `/check-in`               | Employee | Today's check-in                   |
+| `/check-in`               | Employee | Today's check-in (face check)      |
 | `/history`                | Employee | My attendance history              |
 | `/history/:id`            | Employee | My check-in detail (photo + map)   |
 | `/hrd`                    | HRD      | Overview                           |
-| `/hrd/employees`          | HRD      | Employee list                      |
+| `/hrd/employees`          | HRD      | Employee list + photo requests     |
 | `/hrd/employees/new`      | HRD      | Add employee                       |
-| `/hrd/employees/:id/edit` | HRD      | Edit employee                      |
-| `/hrd/attendance`         | HRD      | Attendance list with filters       |
-| `/hrd/attendance/:id`     | HRD      | Attendance detail (photo + map)    |
-| `/account`                | everyone | Change password                    |
+| `/hrd/employees/:id/edit` | HRD      | Edit employee + profile photo      |
+| `/hrd/attendance`         | HRD      | Attendance list, filters, CSV export |
+| `/hrd/attendance/:id`     | HRD      | Attendance detail (photo comparison + map) |
+| `/account`                | everyone | Change password, profile photo (employee) |
 
 ### Login session
 
@@ -388,6 +390,9 @@ account. It is meant for accounts created by mistake, so it is only allowed when
    attendance-service (`GET /attendances?employeeId=<id>`, with the HRD's
    token). If attendance-service cannot be reached, nothing is deleted.
 
+The employee's profile photo and any photo waiting for approval are deleted
+from disk too.
+
 ## API
 
 Interactive API docs (Swagger UI), where you can also try the endpoints:
@@ -418,6 +423,8 @@ or `503` when the database cannot be reached.
 | GET    | `/employees/:id` | HRD  | Employee detail                |
 | POST   | `/employees`     | HRD  | Create employee + login account |
 | PATCH  | `/employees/:id` | HRD  | Update / reactivate employee   |
+| DELETE | `/employees/:id` | HRD  | Deactivate employee            |
+| DELETE | `/employees/:id/permanent` | HRD | Delete employee for good (see above) |
 | PUT    | `/employees/:id/photo` | HRD | Upload / replace profile photo (multipart `photo`, JPEG/PNG, max 5 MB) |
 | GET    | `/employees/:id/photo` | HRD | Profile photo                  |
 | GET    | `/employees/photo-requests` | HRD | Employees with a new photo waiting for approval |
@@ -433,8 +440,6 @@ or `503` when the database cannot be reached.
 `submittedAt` is the `photoRequestAt` value HRD looked at. If the employee
 sent a newer photo in the meantime, approve/reject answers `409` and HRD
 reviews the new one, so HRD never approves a photo they have not seen.
-| DELETE | `/employees/:id` | HRD  | Deactivate employee            |
-| DELETE | `/employees/:id/permanent` | HRD | Delete employee for good (see above) |
 
 ### attendance-service (:3001)
 
@@ -493,7 +498,7 @@ the database.
 ```bash
 npm run build      # build all apps
 npm run lint       # lint all apps
-npm test           # unit tests (backend: login, refresh tokens, change password, employee codes, delete rules, profile photo, check-in / check-out, face check)
+npm test           # unit tests (backend: login, refresh tokens, change password, employee codes, delete rules, profile photo + photo requests, check-in / check-out, face check)
 npm run db:down    # stop MySQL (data is kept in the Docker volume)
 npm run stack:up   # Docker: build and start everything (http://localhost:8080)
 npm run stack:down # Docker: stop everything (data is kept)
@@ -550,6 +555,20 @@ Defaults work for local development. These environment variables can override th
   saved with a random file name, and can only be viewed with a valid token.
 - In Docker the services run as a normal user (not root), and nginx adds
   basic security headers (`X-Frame-Options`, `X-Content-Type-Options`, ...).
+- Face check: the server picks the head-turn order and gives a one-time
+  `challengeId` that belongs to one employee and is only valid for 10 minutes
+  (and not sooner than 1.5 seconds). A camera check-in without a valid
+  challenge and two different head-turn photos is rejected.
+- Profile photos: only HRD can set a photo directly. A photo from the
+  employee is saved as "pending" and only replaces the current one when HRD
+  approves it. Approve / reject must name the request time HRD saw
+  (`submittedAt`), otherwise `409`, so a photo swapped at the last moment is
+  never approved by accident.
+- The `/me/...` endpoints take the employee id from the token, never from the
+  URL, so an employee can only see and change their own data.
+- CSV export: text cells that start with `=`, `+`, `-`, `@`, tab or carriage
+  return get a `'` in front, so Excel does not run them as formulas
+  (CSV / formula injection).
 
 ## Design decisions
 
@@ -566,6 +585,18 @@ Defaults work for local development. These environment variables can override th
   Permanent delete exists only for accounts without attendance.
 - **Photos on disk, not in the database**, with random file names. They can
   only be loaded through the API with a valid token.
+- **Face check in the browser, challenge from the server.** Running MediaPipe
+  in the browser needs no GPU server and no paid API, and the frames never
+  leave the device except the three photos. The server still decides the
+  order and checks the one-time challenge, so a replayed or old upload fails.
+- **HRD compares faces by eye instead of automatic face matching.** Automatic
+  matching needs a recognition model or a paid API, has false matches, and
+  face templates are biometric data under UU 27/2022. Showing the profile
+  photo next to the check-in photos gives HRD what they need without that.
+- **Photo changes need HRD approval**, so an employee cannot put a friend's
+  face on their account and let the friend check in for them.
+- **CSV export in the browser** from the same API the list uses, so there is
+  no extra export endpoint to secure.
 
 ## Known limitations and next steps
 
@@ -591,8 +622,8 @@ The data in these screenshots is demo data, and the photos are placeholders.
 
 | | |
 | --- | --- |
-| ![Login](docs/screenshots/login.png) Login | ![Employee check-in](docs/screenshots/employee-check-in.png) Employee: today's check-in |
-| ![Employee history](docs/screenshots/employee-history.png) Employee: attendance calendar | ![HRD overview](docs/screenshots/hrd-overview.png) HRD: overview |
-| ![HRD employees](docs/screenshots/hrd-employees.png) HRD: employees | ![HRD attendance](docs/screenshots/hrd-attendance.png) HRD: attendance list |
-| ![HRD calendar](docs/screenshots/hrd-calendar.png) HRD: team calendar | ![Attendance detail](docs/screenshots/hrd-attendance-detail.png) HRD: attendance detail |
-| ![Account](docs/screenshots/account.png) Account: change password | ![Swagger](docs/screenshots/swagger.png) API docs (Swagger) |
+| ![Login](docs/screenshots/login.png) Login | ![Employee check-in](docs/screenshots/employee-check-in.png) Employee: face check during check-in |
+| ![Employee history](docs/screenshots/employee-history.png) Employee: attendance calendar | ![HRD overview](docs/screenshots/hrd-overview.png) HRD: overview with photo request banner |
+| ![HRD employees](docs/screenshots/hrd-employees.png) HRD: employees + photo requests | ![HRD attendance](docs/screenshots/hrd-attendance.png) HRD: attendance list + Export CSV |
+| ![HRD calendar](docs/screenshots/hrd-calendar.png) HRD: team calendar | ![Attendance detail](docs/screenshots/hrd-attendance-detail.png) HRD: attendance detail with photo comparison |
+| ![Account](docs/screenshots/account.png) Account: profile photo request + password | ![Swagger](docs/screenshots/swagger.png) API docs (Swagger) |

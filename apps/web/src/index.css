@@ -560,6 +560,8 @@ input:focus, select:focus, textarea:focus {
   border-radius: 999px;
   font-size: 12px;
   font-weight: 600;
+  /* Keep short labels like "Face check" on one line */
+  white-space: nowrap;
 }
 
 .badge-success {

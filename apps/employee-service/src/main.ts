@@ -16,7 +16,7 @@ async function bootstrap() {
   // API docs at /docs (Swagger UI) and /docs-json (OpenAPI file)
   const config = new DocumentBuilder()
     .setTitle('Presentix Employee Service')
-    .setDescription('Login, current user and employee data (HRD only).')
+    .setDescription('Login and sessions, employee data and profile photos (HRD), and the employee\'s own profile photo requests (/me).')
     .setVersion('1.0')
     .addBearerAuth()
     // Behind nginx the API lives under /api/..., so "Try it out" must use that path
