@@ -3,8 +3,10 @@ import { Link } from 'react-router-dom'
 import { CalendarDays, ChevronRight, List, MapPin, Search } from 'lucide-react'
 import { api, type Attendance, type Employee } from '../../lib/api'
 import { useSession } from '../../lib/auth-context'
-import { formatDate, formatTime, getWibToday } from '../../lib/format'
-import { Alert, EmptyState, Loading, PageHeader } from '../../components/ui'
+import { formatDate, getWibToday } from '../../lib/format'
+import Pagination from '../../components/Pagination'
+import { usePagination } from '../../lib/use-pagination'
+import { Alert, EmptyState, Loading, PageHeader, WorkHours } from '../../components/ui'
 import TeamCalendar from '../../components/TeamCalendar'
 
 export default function AttendancePage() {
@@ -55,6 +57,9 @@ export default function AttendancePage() {
 
     return matchesSearch && matchesDate && matchesDepartment
   })
+
+  // 20 rows per page. Changing a filter goes back to page 1.
+  const pages = usePagination(filtered, `${query}|${date}|${department}`, 20)
 
   return (
     <>
@@ -163,7 +168,7 @@ export default function AttendancePage() {
                     <th>Employee</th>
                     <th>Department</th>
                     <th>Date</th>
-                    <th>Time</th>
+                    <th>Check-in / out</th>
                     <th>Agenda</th>
                     <th>Photo</th>
                     <th>Location</th>
@@ -171,7 +176,7 @@ export default function AttendancePage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.map(record => {
+                  {pages.pageItems.map(record => {
                     const employee = findEmployee(record.employeeId)
 
                     return (
@@ -184,7 +189,7 @@ export default function AttendancePage() {
                         </td>
                         <td>{employee?.department ?? '-'}</td>
                         <td>{formatDate(record.attendanceDate)}</td>
-                        <td>{formatTime(record.checkedInAt)}</td>
+                        <td><WorkHours checkedInAt={record.checkedInAt} checkedOutAt={record.checkedOutAt} /></td>
                         <td>
                           <span className="note-preview" title={record.note ?? undefined}>
                             {record.note || '-'}
@@ -219,7 +224,13 @@ export default function AttendancePage() {
                   })}
                 </tbody>
               </table>
-              <p className="table-footer">{filtered.length} of {records.length} records</p>
+              <Pagination
+                {...pages}
+                total={filtered.length}
+                allCount={records.length}
+                label="records"
+                onChange={pages.setPage}
+              />
             </>
           )}
         </div>

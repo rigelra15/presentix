@@ -5,6 +5,8 @@ import { api, type Employee } from '../../lib/api'
 import { useSession } from '../../lib/auth-context'
 import { Alert, EmptyState, Loading, PageHeader, StatusBadge } from '../../components/ui'
 import EmployeeActionDialog, { type EmployeeAction } from '../../components/EmployeeActionDialog'
+import Pagination from '../../components/Pagination'
+import { usePagination } from '../../lib/use-pagination'
 
 type StatusFilter = 'all' | 'active' | 'inactive'
 
@@ -67,6 +69,9 @@ export default function EmployeesPage() {
     return matchesStatus && matchesSearch
   })
 
+  // 10 employees per page. Changing a filter goes back to page 1.
+  const pages = usePagination(filtered, `${query}|${statusFilter}`, 10)
+
   return (
     <>
       <PageHeader
@@ -121,7 +126,7 @@ export default function EmployeesPage() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map(employee => (
+              {pages.pageItems.map(employee => (
                 <tr key={employee.id}>
                   <td>
                     <div className="person-cell">
@@ -184,6 +189,16 @@ export default function EmployeesPage() {
               ))}
             </tbody>
           </table>
+        )}
+
+        {!loading && filtered.length > 0 && (
+          <Pagination
+            {...pages}
+            total={filtered.length}
+            allCount={employees.length}
+            label="employees"
+            onChange={pages.setPage}
+          />
         )}
       </div>
 

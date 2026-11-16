@@ -766,6 +766,30 @@ input:focus, select:focus, textarea:focus {
   font-size: 13px;
 }
 
+/* Table footer with page buttons on the right */
+.pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+
+.pagination-pages {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.pagination-pages .btn {
+  min-width: 32px;
+  justify-content: center;
+}
+
+.pagination-gap {
+  padding: 0 4px;
+}
+
 .toolbar {
   display: flex;
   flex-wrap: wrap;
