@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { CalendarCheck, CheckCircle2, LocateFixed, MapPin, Send } from 'lucide-react'
+import { CalendarCheck, CheckCircle2, Clock, LocateFixed, LogOut, MapPin, Send } from 'lucide-react'
 import {
   api,
   submitCheckIn,
@@ -9,11 +9,12 @@ import {
   type PhotoSource
 } from '../../lib/api'
 import { useSession } from '../../lib/auth-context'
-import { formatDate, formatTime, getWibToday } from '../../lib/format'
+import { formatDate, formatDuration, formatTime, getWibToday } from '../../lib/format'
 import { Alert, Loading, PageHeader } from '../../components/ui'
 import CameraCapture from '../../components/CameraCapture'
 import LocationMap from '../../components/LazyLocationMap'
 import ProtectedPhoto from '../../components/ProtectedPhoto'
+import ConfirmDialog from '../../components/ConfirmDialog'
 
 // Same limits as the API
 const NOTE_MIN = 3
@@ -49,6 +50,11 @@ export default function CheckInPage() {
   const [note, setNote] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
+
+  // Check-out confirmation modal
+  const [confirmCheckOut, setConfirmCheckOut] = useState(false)
+  const [checkingOut, setCheckingOut] = useState(false)
+  const [checkOutError, setCheckOutError] = useState('')
 
   useEffect(() => {
     api<Attendance[]>('/api/attendance/attendances/me', { token })
@@ -106,6 +112,24 @@ export default function CheckInPage() {
     }
   }
 
+  async function handleCheckOut() {
+    setCheckingOut(true)
+    setCheckOutError('')
+
+    try {
+      const record = await api<Attendance>('/api/attendance/attendances/me/check-out', {
+        token,
+        method: 'POST'
+      })
+      setTodayRecord(record)
+      setConfirmCheckOut(false)
+    } catch (err) {
+      setCheckOutError(err instanceof Error ? err.message : 'Check-out failed')
+    } finally {
+      setCheckingOut(false)
+    }
+  }
+
   if (loading) {
     return <Loading text="Checking today's attendance..." />
   }
@@ -125,16 +149,51 @@ export default function CheckInPage() {
       <>
         <PageHeader title="WFH Check-in" description={formatDate(today)} />
 
-        <div className="card success-card">
-          <CheckCircle2 size={40} />
-          <div>
-            <h2>You're checked in for today</h2>
-            <p>
-              Recorded at <strong>{formatTime(todayRecord.checkedInAt)}</strong>.
-              You can check in again tomorrow.
-            </p>
+        {todayRecord.checkedOutAt ? (
+          <div className="card success-card">
+            <CheckCircle2 size={40} />
+            <div>
+              <h2>Your WFH day is complete</h2>
+              <p>
+                In <strong>{formatTime(todayRecord.checkedInAt)}</strong>, out{' '}
+                <strong>{formatTime(todayRecord.checkedOutAt)}</strong>. Worked{' '}
+                <strong>{formatDuration(todayRecord.checkedInAt, todayRecord.checkedOutAt)}</strong>.
+                See you tomorrow.
+              </p>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="card success-card success-card-action">
+            <Clock size={40} />
+            <div>
+              <h2>You're checked in for today</h2>
+              <p>
+                Recorded at <strong>{formatTime(todayRecord.checkedInAt)}</strong>.
+                Check out when you finish work.
+              </p>
+            </div>
+            <button type="button" className="btn btn-primary" onClick={() => setConfirmCheckOut(true)}>
+              <LogOut size={16} />
+              Check out
+            </button>
+          </div>
+        )}
+
+        <ConfirmDialog
+          open={confirmCheckOut}
+          title="Check out now?"
+          confirmLabel="Check out"
+          busy={checkingOut}
+          error={checkOutError}
+          onConfirm={handleCheckOut}
+          onClose={() => {
+            setConfirmCheckOut(false)
+            setCheckOutError('')
+          }}
+        >
+          <p>This ends your WFH day. The server records the current time.</p>
+          <p>You can check out only once per day.</p>
+        </ConfirmDialog>
 
         <div className="detail-grid">
           <section className="card">

@@ -54,3 +54,11 @@ export function toWibDate(value: string): string {
     new Date(value)
   )
 }
+
+// Time between check-in and check-out, e.g. "8h 05m"
+export function formatDuration(from: string, to: string): string {
+  const minutes = Math.max(0, Math.round((new Date(to).getTime() - new Date(from).getTime()) / 60000))
+  const hours = Math.floor(minutes / 60)
+
+  return `${hours}h ${String(minutes % 60).padStart(2, '0')}m`
+}

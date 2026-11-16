@@ -3,7 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { ArrowLeft, MapPinOff } from 'lucide-react'
 import { api, type Attendance, type Employee } from '../../lib/api'
 import { useSession } from '../../lib/auth-context'
-import { formatDate, formatTime } from '../../lib/format'
+import { formatDate, formatDuration, formatTime } from '../../lib/format'
 import { Alert, Loading, PageHeader, StatusBadge } from '../../components/ui'
 import LocationMap from '../../components/LazyLocationMap'
 import ProtectedPhoto from '../../components/ProtectedPhoto'
@@ -91,6 +91,14 @@ export default function AttendanceDetailPage() {
                   <dd>{formatDate(record.attendanceDate)}</dd>
                   <dt>Check-in time</dt>
                   <dd>{formatTime(record.checkedInAt)}</dd>
+                  <dt>Check-out time</dt>
+                  <dd>{record.checkedOutAt ? formatTime(record.checkedOutAt) : 'Not checked out'}</dd>
+                  {record.checkedOutAt && (
+                    <>
+                      <dt>Work duration</dt>
+                      <dd>{formatDuration(record.checkedInAt, record.checkedOutAt)}</dd>
+                    </>
+                  )}
                   <dt>Photo</dt>
                   <dd>
                     {record.photoSource === 'UPLOAD' ? (

@@ -171,3 +171,32 @@ describe('AttendancesService.findOne', () => {
     expect((await service.findOne(1, hrd)).id).toBe(1);
   });
 });
+
+describe('AttendancesService.checkOut', () => {
+  it("checks out today's check-in", async () => {
+    const { service, saved } = createService({ id: 1, employeeId: 5, checkedOutAt: null });
+
+    const result = await service.checkOut(employee);
+
+    expect(result.checkedOutAt).toBeInstanceOf(Date);
+    expect(saved).toHaveLength(1);
+  });
+
+  it('needs a check-in today first', async () => {
+    const { service } = createService(null);
+
+    await expect(service.checkOut(employee)).rejects.toThrow('not checked in today');
+  });
+
+  it('allows only one check-out per day', async () => {
+    const { service } = createService({ id: 1, employeeId: 5, checkedOutAt: new Date() });
+
+    await expect(service.checkOut(employee)).rejects.toThrow('already checked out');
+  });
+
+  it('is only for employees', async () => {
+    const { service } = createService({ id: 1, employeeId: 5, checkedOutAt: null });
+
+    await expect(service.checkOut(hrd)).rejects.toThrow('Only employees');
+  });
+});

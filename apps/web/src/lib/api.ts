@@ -34,6 +34,8 @@ export interface Attendance {
   employeeId: number
   attendanceDate: string
   checkedInAt: string
+  // Empty until the employee checks out
+  checkedOutAt: string | null
   photoUrl: string
   latitude: number | null
   longitude: number | null

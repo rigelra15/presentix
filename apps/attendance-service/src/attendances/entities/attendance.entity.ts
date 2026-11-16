@@ -35,6 +35,15 @@ export class Attendance {
   })
   checkedInAt!: Date;
 
+  // Set when the employee checks out. NULL = not checked out (yet).
+  @Column({
+    name: 'checked_out_at',
+    type: 'datetime',
+    precision: 3,
+    nullable: true,
+  })
+  checkedOutAt!: Date | null;
+
   @Column({
     name: 'photo_path',
     type: 'varchar',

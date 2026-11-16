@@ -1450,6 +1450,35 @@ button.calendar-day:hover {
   color: var(--text);
 }
 
+/* Checked in, not checked out yet: neutral colors and a button on the right */
+.success-card-action {
+  border-color: var(--border);
+  background: var(--surface);
+  color: var(--primary);
+}
+
+.success-card-action > div {
+  flex: 1;
+}
+
+@media (max-width: 640px) {
+  .success-card-action {
+    flex-wrap: wrap;
+  }
+
+  .success-card-action .btn {
+    width: 100%;
+  }
+}
+
+/* Check-in time with check-out time below it (tables) */
+.work-hours {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  white-space: nowrap;
+}
+
 /* =========================================================
    Attendance detail
    ========================================================= */

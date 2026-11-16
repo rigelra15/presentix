@@ -3,8 +3,8 @@ import { Link } from 'react-router-dom'
 import { CheckCircle2, Clock3, UserCheck, Users } from 'lucide-react'
 import { api, type Attendance, type Employee } from '../../lib/api'
 import { useSession } from '../../lib/auth-context'
-import { formatDate, formatTime, getWibToday } from '../../lib/format'
-import { Alert, EmptyState, Loading, PageHeader, StatCard } from '../../components/ui'
+import { formatDate, getWibToday } from '../../lib/format'
+import { Alert, EmptyState, Loading, PageHeader, StatCard, WorkHours } from '../../components/ui'
 
 export default function OverviewPage() {
   const { token } = useSession()
@@ -86,7 +86,7 @@ export default function OverviewPage() {
               <thead>
                 <tr>
                   <th>Employee</th>
-                  <th>Time</th>
+                  <th>Check-in / out</th>
                   <th>Agenda</th>
                   <th></th>
                 </tr>
@@ -95,7 +95,7 @@ export default function OverviewPage() {
                 {todayRecords.map(record => (
                   <tr key={record.id}>
                     <td>{employeeName(record.employeeId)}</td>
-                    <td>{formatTime(record.checkedInAt)}</td>
+                    <td><WorkHours checkedInAt={record.checkedInAt} checkedOutAt={record.checkedOutAt} /></td>
                     <td>
                       <span className="note-preview" title={record.note ?? undefined}>
                         {record.note || '-'}

@@ -33,6 +33,7 @@ export class AttendancesService {
       employeeId: attendance.employeeId,
       attendanceDate: attendance.attendanceDate,
       checkedInAt: attendance.checkedInAt,
+      checkedOutAt: attendance.checkedOutAt ?? null,
       createdAt: attendance.createdAt,
       latitude:
         attendance.latitude === null ? null : Number(attendance.latitude),
@@ -221,6 +222,34 @@ export class AttendancesService {
 
       throw error;
     }
+  }
+
+  // Check out = the employee finished work today.
+  // Only today's check-in (Asia/Jakarta date) can be checked out, once.
+  async checkOut(user: SessionUser) {
+    if (user.role !== 'EMPLOYEE' || !user.employeeId) {
+      throw new ForbiddenException('Only employees can check out');
+    }
+
+    const now = new Date();
+
+    const attendance = await this.attendances.findOneBy({
+      employeeId: user.employeeId,
+      attendanceDate: this.getWibDate(now),
+    });
+
+    if (!attendance) {
+      throw new BadRequestException('You have not checked in today');
+    }
+
+    if (attendance.checkedOutAt) {
+      throw new ConflictException('You have already checked out today');
+    }
+
+    attendance.checkedOutAt = now;
+    const saved = await this.attendances.save(attendance);
+
+    return this.toResponse(saved);
   }
 
   async findMine(user: SessionUser) {

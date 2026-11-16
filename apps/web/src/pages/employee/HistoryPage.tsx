@@ -5,7 +5,7 @@ import { api, type Attendance, type SessionUser } from '../../lib/api'
 import { useSession } from '../../lib/auth-context'
 import { formatDate, formatTime, getWibToday, toWibDate } from '../../lib/format'
 import { getEmployeeDay, getMonthDates } from '../../lib/calendar'
-import { Alert, EmptyState, Loading, PageHeader, StatCard } from '../../components/ui'
+import { Alert, EmptyState, Loading, PageHeader, StatCard, WorkHours } from '../../components/ui'
 import AttendanceCalendar from '../../components/AttendanceCalendar'
 
 export default function HistoryPage() {
@@ -108,7 +108,7 @@ export default function HistoryPage() {
                 <thead>
                   <tr>
                     <th>Date</th>
-                    <th>Check-in time</th>
+                    <th>Check-in / out</th>
                     <th>Agenda</th>
                     <th>Status</th>
                     <th></th>
@@ -122,7 +122,7 @@ export default function HistoryPage() {
                           <strong>{formatDate(record.attendanceDate)}</strong>
                         </Link>
                       </td>
-                      <td>{formatTime(record.checkedInAt)}</td>
+                      <td><WorkHours checkedInAt={record.checkedInAt} checkedOutAt={record.checkedOutAt} /></td>
                       <td>
                         <span className="note-preview" title={record.note ?? undefined}>
                           {record.note || '-'}

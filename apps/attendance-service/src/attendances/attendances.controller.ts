@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Header, Param, ParseIntPipe, Post, Query, Req, UploadedFile, UseGuards, UseInterceptors } from "@nestjs/common";
+import { Body, Controller, Get, Header, HttpCode, HttpStatus, Param, ParseIntPipe, Post, Query, Req, UploadedFile, UseGuards, UseInterceptors } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
 import { memoryStorage } from "multer";
 import { ApiBearerAuth, ApiBody, ApiConsumes, ApiQuery, ApiTags } from "@nestjs/swagger";
@@ -52,6 +52,13 @@ export class AttendancesController {
     @UploadedFile() file?: Express.Multer.File,
   ) {
     return this.attendancesService.create(request.user, body, file);
+  }
+
+  // Must be above ':id' routes. Uses today's check-in of the logged-in employee.
+  @Post('me/check-out')
+  @HttpCode(HttpStatus.OK)
+  checkOut(@Req() request: AuthenticatedRequest) {
+    return this.attendancesService.checkOut(request.user);
   }
 
   @Get('me')

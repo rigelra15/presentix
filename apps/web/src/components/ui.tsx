@@ -1,6 +1,7 @@
 // Small reusable UI pieces used by many pages.
 import type { ReactNode } from 'react'
 import { AlertCircle, CheckCircle2, Inbox } from 'lucide-react'
+import { formatTime } from '../lib/format'
 
 export function PageHeader({
   title,
@@ -85,5 +86,23 @@ export function Loading({ text = 'Loading...' }: { text?: string }) {
       <span className="spinner" />
       {text}
     </div>
+  )
+}
+
+// Check-in time with the check-out time below it, for tables
+export function WorkHours({
+  checkedInAt,
+  checkedOutAt
+}: {
+  checkedInAt: string
+  checkedOutAt: string | null
+}) {
+  return (
+    <span className="work-hours">
+      <span>In {formatTime(checkedInAt)}</span>
+      <small className="muted">
+        {checkedOutAt ? `Out ${formatTime(checkedOutAt)}` : 'Not checked out'}
+      </small>
+    </span>
   )
 }
