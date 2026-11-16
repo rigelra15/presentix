@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { databaseOptions } from './database.config.js';
 import { User } from './users/entities/user.entity.js';
 import { Employee } from './employees/entities/employee.entity.js';
+import { RefreshToken } from './auth/entities/refresh-token.entity.js';
 
 const migrationPath = fileURLToPath(
   new URL('./migrations/*.js', import.meta.url),
@@ -13,7 +14,7 @@ const migrationPath = fileURLToPath(
 export default new DataSource({
   ...databaseOptions,
   type: 'mysql',
-  entities: [User, Employee],
+  entities: [User, Employee, RefreshToken],
   migrations: [migrationPath],
   synchronize: false,
   migrationsRun: false,

@@ -5,6 +5,7 @@ import { ThrottlerModule } from '@nestjs/throttler';
 
 import { User } from '../users/entities/user.entity.js';
 import { Employee } from '../employees/entities/employee.entity.js';
+import { RefreshToken } from './entities/refresh-token.entity.js';
 
 import { AuthController } from './auth.controller.js';
 import { AuthService } from './auth.service.js';
@@ -20,23 +21,32 @@ import { RolesGuard } from './roles.guard.js';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User, Employee]),
+    TypeOrmModule.forFeature([User, Employee, RefreshToken]),
     JwtModule.register({
       secret: jwtSecret,
       signOptions: {
-        expiresIn: '30m',
+        // Short-lived. The browser gets a new one from POST /auth/refresh.
+        expiresIn: '15m',
         issuer: jwtIssuer,
         audience: jwtAudience,
       },
     }),
-    // Limits login attempts (only used on POST /auth/login).
-    // Counted per IP address + email, so guessing one account's
+    // Limits login and change-password attempts.
+    // Login is counted per IP address + email, change-password per user, so guessing one account's
     // password is blocked without locking out everyone behind the
     // same IP (in development all requests come through the Vite proxy).
     ThrottlerModule.forRoot({
       throttlers: [{ ttl: 60_000, limit: 5 }],
-      errorMessage: 'Too many login attempts. Please wait a minute and try again.',
-      getTracker: (request: { ip?: string; body?: { email?: unknown } }) => {
+      errorMessage: 'Too many attempts. Please wait a minute and try again.',
+      getTracker: (request: {
+        ip?: string;
+        body?: { email?: unknown };
+        user?: { id: number };
+      }) => {
+        if (request.user) {
+          return `user:${request.user.id}`;
+        }
+
         const email =
           typeof request.body?.email === 'string'
             ? request.body.email.trim().toLowerCase()

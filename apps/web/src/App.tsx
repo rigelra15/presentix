@@ -4,6 +4,7 @@ import Layout from './components/Layout'
 import RequireAuth from './components/RequireAuth'
 import LoginPage from './pages/LoginPage'
 import NotFoundPage from './pages/NotFoundPage'
+import AccountPage from './pages/AccountPage'
 import CheckInPage from './pages/employee/CheckInPage'
 import HistoryPage from './pages/employee/HistoryPage'
 import OverviewPage from './pages/hrd/OverviewPage'
@@ -45,6 +46,13 @@ export default function App() {
           <Route path="/hrd/employees/:id/edit" element={<EmployeeFormPage />} />
           <Route path="/hrd/attendance" element={<AttendancePage />} />
           <Route path="/hrd/attendance/:id" element={<AttendanceDetailPage />} />
+        </Route>
+      </Route>
+
+      {/* Pages for both roles */}
+      <Route element={<RequireAuth />}>
+        <Route element={<Layout />}>
+          <Route path="/account" element={<AccountPage />} />
         </Route>
       </Route>
 

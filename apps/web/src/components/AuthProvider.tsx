@@ -1,37 +1,54 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import {
   api,
+  refreshAccessToken,
   SESSION_EXPIRED_EVENT,
+  TOKEN_REFRESHED_EVENT,
   type LoginResponse,
   type SessionUser
 } from '../lib/api'
 import { AuthContext, type Session } from '../lib/auth-context'
+import { Loading } from './ui'
 
-// sessionStorage keeps the user logged in after a page refresh,
-// but the session is cleared when the browser tab is closed.
-const STORAGE_KEY = 'wfh-session'
-
-function loadSession(): Session | null {
-  try {
-    const saved = sessionStorage.getItem(STORAGE_KEY)
-    return saved ? (JSON.parse(saved) as Session) : null
-  } catch {
-    return null
-  }
+// The access token (15 minutes) is kept only in memory, never in
+// localStorage/sessionStorage. The refresh token is an httpOnly cookie
+// that page scripts cannot read. After a page reload the session is
+// restored by asking the server for a new access token.
+async function loadUser(token: string): Promise<Session> {
+  // /auth/me also returns employeeId for employee accounts
+  const user = await api<SessionUser>('/api/employee/auth/me', { token })
+  return { token, user }
 }
 
 export default function AuthProvider({ children }: { children: ReactNode }) {
-  const [session, setSession] = useState<Session | null>(loadSession)
+  const [session, setSession] = useState<Session | null>(null)
+  const [restoring, setRestoring] = useState(true)
 
-  function saveSession(value: Session | null) {
-    if (value) {
-      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(value))
-    } else {
-      sessionStorage.removeItem(STORAGE_KEY)
+  // On page load: still logged in from before?
+  useEffect(() => {
+    let ignore = false
+
+    // Older versions kept the token in sessionStorage. Remove it.
+    try {
+      sessionStorage.removeItem('wfh-session')
+    } catch {
+      // Storage can be blocked. Nothing to clean up then.
     }
 
-    setSession(value)
-  }
+    refreshAccessToken()
+      .then(token => (token ? loadUser(token) : null))
+      .catch(() => null)
+      .then(restored => {
+        if (!ignore) {
+          setSession(restored)
+          setRestoring(false)
+        }
+      })
+
+    return () => {
+      ignore = true
+    }
+  }, [])
 
   async function login(email: string, password: string) {
     const result = await api<LoginResponse>('/api/employee/auth/login', {
@@ -39,29 +56,42 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
       body: { email, password }
     })
 
-    // /auth/me also returns employeeId for employee accounts
-    const user = await api<SessionUser>('/api/employee/auth/me', {
-      token: result.access_token
-    })
-
-    saveSession({ token: result.access_token, user })
-    return user
+    const newSession = await loadUser(result.access_token)
+    setSession(newSession)
+    return newSession.user
   }
 
-  function logout() {
-    saveSession(null)
+  async function logout() {
+    // Ends the session on the server too, so the refresh cookie
+    // cannot be used again even if it was copied.
+    await fetch('/api/employee/auth/logout', { method: 'POST' }).catch(() => undefined)
+    setSession(null)
   }
 
-  // Log out automatically when any request gets HTTP 401
   useEffect(() => {
+    // Keep the newest access token after a refresh
+    function onRefreshed(event: Event) {
+      const token = (event as CustomEvent<string>).detail
+      setSession(current => (current ? { ...current, token } : current))
+    }
+
+    // Log out when the session cannot be renewed
     function onExpired() {
-      sessionStorage.removeItem(STORAGE_KEY)
       setSession(null)
     }
 
+    window.addEventListener(TOKEN_REFRESHED_EVENT, onRefreshed)
     window.addEventListener(SESSION_EXPIRED_EVENT, onExpired)
-    return () => window.removeEventListener(SESSION_EXPIRED_EVENT, onExpired)
+
+    return () => {
+      window.removeEventListener(TOKEN_REFRESHED_EVENT, onRefreshed)
+      window.removeEventListener(SESSION_EXPIRED_EVENT, onExpired)
+    }
   }, [])
+
+  if (restoring) {
+    return <Loading text="Loading..." />
+  }
 
   return (
     <AuthContext.Provider value={{ session, login, logout }}>

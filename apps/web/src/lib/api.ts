@@ -52,9 +52,66 @@ export interface CheckInLocation {
   accuracy: number
 }
 
-// Fired when the server says the token is no longer valid.
+// Fired when the session cannot be renewed any more.
 // AuthProvider listens to this event and logs the user out.
 export const SESSION_EXPIRED_EVENT = 'session-expired'
+
+// Fired with the new access token after a refresh, so AuthProvider
+// can keep it (event.detail is the token).
+export const TOKEN_REFRESHED_EVENT = 'token-refreshed'
+
+let refreshing: Promise<string | null> | null = null
+
+// Gets a new access token using the httpOnly refresh cookie.
+// Returns null when the user is not logged in (any more).
+//
+// Several requests can fail with 401 at the same time. They all wait
+// for the same refresh instead of each starting one. The Web Lock also
+// makes other tabs wait, because every refresh replaces the cookie and
+// using an old cookie again ends the session.
+export function refreshAccessToken(): Promise<string | null> {
+  if (!refreshing) {
+    const doRefresh = async () => {
+      const response = await fetch('/api/employee/auth/refresh', { method: 'POST' })
+
+      if (!response.ok) {
+        return null
+      }
+
+      const data = (await response.json()) as LoginResponse
+      window.dispatchEvent(new CustomEvent(TOKEN_REFRESHED_EVENT, { detail: data.access_token }))
+      return data.access_token
+    }
+
+    const run = navigator.locks
+      ? navigator.locks.request('auth-refresh', doRefresh)
+      : doRefresh()
+
+    refreshing = run
+      .catch(() => null)
+      .finally(() => {
+        refreshing = null
+      })
+  }
+
+  return refreshing
+}
+
+// Sends a request with the access token. If the token has expired (401),
+// gets a new one and tries once more.
+async function fetchWithToken(
+  token: string | undefined,
+  send: (token: string | undefined) => Promise<Response>
+): Promise<Response> {
+  const response = await send(token)
+
+  if (response.status !== 401 || !token) {
+    return response
+  }
+
+  const newToken = await refreshAccessToken()
+  return newToken ? send(newToken) : response
+}
 
 // NestJS returns `message` as a string, or as an array for validation errors.
 function getErrorMessage(data: unknown, status: number): string {
@@ -108,20 +165,22 @@ export async function api<T>(
     body?: unknown
   } = {}
 ): Promise<T> {
-  const headers: Record<string, string> = {}
+  const response = await fetchWithToken(options.token, token => {
+    const headers: Record<string, string> = {}
 
-  if (options.token) {
-    headers.Authorization = `Bearer ${options.token}`
-  }
+    if (token) {
+      headers.Authorization = `Bearer ${token}`
+    }
 
-  if (options.body !== undefined) {
-    headers['Content-Type'] = 'application/json'
-  }
+    if (options.body !== undefined) {
+      headers['Content-Type'] = 'application/json'
+    }
 
-  const response = await fetch(path, {
-    method: options.method ?? 'GET',
-    headers,
-    body: options.body !== undefined ? JSON.stringify(options.body) : undefined
+    return fetch(path, {
+      method: options.method ?? 'GET',
+      headers,
+      body: options.body !== undefined ? JSON.stringify(options.body) : undefined
+    })
   })
 
   return handleResponse<T>(response, options.token)
@@ -143,11 +202,13 @@ export async function submitCheckIn(
   formData.append('photoSource', photoSource)
   formData.append('photo', photo, photo.type === 'image/png' ? 'checkin.png' : 'checkin.jpg')
 
-  const response = await fetch('/api/attendance/attendances', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}` },
-    body: formData
-  })
+  const response = await fetchWithToken(token, currentToken =>
+    fetch('/api/attendance/attendances', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${currentToken}` },
+      body: formData
+    })
+  )
 
   if (response.status === 409) {
     throw new Error('You have already checked in today.')
@@ -166,12 +227,11 @@ export async function fetchPhoto(
   token: string,
   attendanceId: number
 ): Promise<Blob> {
-  const response = await fetch(
-    `/api/attendance/attendances/${attendanceId}/photo`,
-    {
-      headers: { Authorization: `Bearer ${token}` },
+  const response = await fetchWithToken(token, currentToken =>
+    fetch(`/api/attendance/attendances/${attendanceId}/photo`, {
+      headers: { Authorization: `Bearer ${currentToken}` },
       cache: 'no-store'
-    }
+    })
   )
 
   if (response.status === 401) {

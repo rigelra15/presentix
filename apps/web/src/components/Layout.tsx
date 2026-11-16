@@ -4,6 +4,7 @@ import {
   Camera,
   ClipboardList,
   History,
+  KeyRound,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -15,12 +16,14 @@ import { useSession, useAuth } from '../lib/auth-context'
 const hrdMenu = [
   { to: '/hrd', label: 'Overview', icon: LayoutDashboard, end: true },
   { to: '/hrd/employees', label: 'Employees', icon: Users, end: false },
-  { to: '/hrd/attendance', label: 'Attendance', icon: ClipboardList, end: false }
+  { to: '/hrd/attendance', label: 'Attendance', icon: ClipboardList, end: false },
+  { to: '/account', label: 'Account', icon: KeyRound, end: true }
 ]
 
 const employeeMenu = [
   { to: '/check-in', label: 'Check-in', icon: Camera, end: true },
-  { to: '/history', label: 'My History', icon: History, end: true }
+  { to: '/history', label: 'My History', icon: History, end: true },
+  { to: '/account', label: 'Account', icon: KeyRound, end: true }
 ]
 
 export default function Layout() {
@@ -31,8 +34,8 @@ export default function Layout() {
 
   const menu = user.role === 'HRD' ? hrdMenu : employeeMenu
 
-  function handleLogout() {
-    logout()
+  async function handleLogout() {
+    await logout()
     navigate('/login', { replace: true })
   }
 
