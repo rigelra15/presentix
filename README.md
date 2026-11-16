@@ -254,6 +254,15 @@ npm run check:login
 A printed photo or a photo on another phone cannot turn its head, so the
 camera check-in asks for a short head movement first:
 
+<p align="center">
+  <img src="docs/face-check.gif" width="480" alt="Face check: an oval shows where to put the face, arrows show which way to turn, a bar fills while the pose is held, and each step ends with a green check">
+</p>
+<p align="center"><sub>Animated illustration of the face check guide (drawn face, real app styles).</sub></p>
+
+On the camera the employee sees an **oval** for the face (the rest of the
+picture is dimmed), **moving arrows** to the side to turn to, a **bar** that
+fills while the pose is held, and a **green check** after each step.
+
 1. The browser asks `POST /attendances/liveness-challenge`. The server picks
    the order (`LEFT, RIGHT` or `RIGHT, LEFT`) and returns a one-time
    `challengeId`.
