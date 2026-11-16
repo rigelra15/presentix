@@ -50,7 +50,8 @@ The name comes from **hearth** (home) + **roll call** (attendance).
 - **Database:** MySQL 8.4 (Docker), TypeORM migrations
 - **Password hashing:** Argon2id
 - **API docs:** Swagger (OpenAPI) on both services
-- **CI:** GitHub Actions runs lint, unit tests and build
+- **Docker:** the whole app (MySQL, both services, nginx + web) runs with one command
+- **CI:** GitHub Actions runs lint, unit tests, build and the Docker build
 
 ## Architecture
 
@@ -77,12 +78,56 @@ The name comes from **hearth** (home) + **roll call** (attendance).
 - The Vite dev server proxies `/api/employee/*` and `/api/attendance/*` to the
   services, so the browser only talks to one origin (no CORS setup needed).
 
-## Requirements
+## Quick start with Docker
+
+Only Docker Desktop (with Compose v2) is needed. This is the easiest way to try the app.
+
+```bash
+# 1. Create the secret files (random DB passwords and JWT secret) in docker/secrets/
+node scripts/setup-secrets.mjs
+#    No Node.js installed? Run the same script inside Docker:
+#    docker run --rm -v "$PWD":/app -w /app -u "$(id -u):$(id -g)" node:22-alpine node scripts/setup-secrets.mjs
+
+# 2. Build and start MySQL, both services and the web app
+docker compose --profile app up -d --build --wait
+
+# 3. Create the demo HRD and employee accounts
+docker compose run --rm seed
+```
+
+Open **http://localhost:8080** and log in with an account from
+`docker/secrets/demo-accounts.json`. To create your own HRD account instead of
+the demo accounts, run `docker compose run --rm seed npm run create-hrd`.
+
+| What                | URL                                     |
+| ------------------- | --------------------------------------- |
+| Web app             | http://localhost:8080                   |
+| Employee API docs   | http://localhost:8080/api/employee/docs |
+| Attendance API docs | http://localhost:8080/api/attendance/docs |
+
+Stop it with `docker compose --profile app down` (data is kept). With npm the
+same commands are `npm run stack:up`, `npm run stack:seed` and `npm run stack:down`.
+
+How it works:
+
+- nginx (in the `web` container) serves the built React app and forwards
+  `/api/employee/*` and `/api/attendance/*` to the services, like the Vite
+  proxy does in development. Only port 8080 is opened, on `127.0.0.1`.
+- Each service runs its new migrations when it starts.
+- The services wait until MySQL is healthy, and the web app waits until both
+  services answer `GET /health`.
+- The app services use the `app` profile, so `npm run db:up` (plain
+  `docker compose up`) still starts only MySQL for local development. Both ways
+  use the same database and the same photo folder.
+
+## Local development setup
+
+### Requirements
 
 - Node.js 24 LTS (or 22.22.3+) and npm
 - Docker Desktop (with Docker Compose v2)
 
-## Setup
+### Setup
 
 ```bash
 npm install
@@ -100,7 +145,7 @@ npm run setup
 
 After this the database is empty. Create accounts with **one** of these options.
 
-### Option A – demo accounts (quick try)
+#### Option A – demo accounts (quick try)
 
 ```bash
 npm run seed
@@ -110,7 +155,7 @@ Creates one HRD and one employee account (for example
 `hrd.demo@dexagroup.com`). The passwords are generated randomly and saved in `docker/secrets/demo-accounts.json`. Open that
 file to see them.
 
-### Option B – real accounts (empty database)
+#### Option B – real accounts (empty database)
 
 There is no public sign-up page, so the first HRD account is created from the
 terminal:
@@ -128,7 +173,7 @@ uppercase letter, a lowercase letter and a number.
 Then log in as that HRD and add employees from the **Employee Management**
 page. Each employee gets their own login account (email + password set by HRD).
 
-## Running the app
+### Running the app
 
 Open 3 terminals in the project root:
 
@@ -284,8 +329,8 @@ account. It is meant for accounts created by mistake, so it is only allowed when
 
 Interactive API docs (Swagger UI), where you can also try the endpoints:
 
-- employee-service: http://localhost:3000/docs
-- attendance-service: http://localhost:3001/docs
+- Local development: http://localhost:3000/docs and http://localhost:3001/docs
+- Docker: http://localhost:8080/api/employee/docs and http://localhost:8080/api/attendance/docs
 
 The OpenAPI file is at `/docs-json`. Click **Authorize** and paste the
 `access_token` from `POST /auth/login` to call the protected endpoints.
@@ -362,10 +407,12 @@ npm run build      # build all apps
 npm run lint       # lint all apps
 npm test           # unit tests (backend: login, refresh tokens, change password, employee codes, delete rules, check-in / check-out)
 npm run db:down    # stop MySQL (data is kept in the Docker volume)
+npm run stack:up   # Docker: build and start everything (http://localhost:8080)
+npm run stack:down # Docker: stop everything (data is kept)
 ```
 
 Every push to `main` runs the same lint, test and build steps in GitHub
-Actions (`.github/workflows/ci.yml`).
+Actions (`.github/workflows/ci.yml`), plus a check that the Docker images build.
 
 Check migration status for one service:
 
@@ -389,8 +436,10 @@ Defaults work for local development. These environment variables can override th
 | `ATTENDANCE_PHOTO_DIR`  | attendance-service | `storage/attendance-photos`                |
 | `EMPLOYEE_API_URL`      | web (Vite proxy)   | `http://127.0.0.1:3000`                    |
 | `ATTENDANCE_API_URL`    | web (Vite proxy)   | `http://127.0.0.1:3001`                    |
-| `API_BASE_PATH`         | both services      | `/` (path used by Swagger "Try it out" when the API is behind a proxy) |
+| `API_BASE_PATH`         | both services      | `/` (Swagger "Try it out" path, `/api/...` in Docker) |
 | `COOKIE_SECURE`         | employee-service   | `false` (set `true` when served over HTTPS) |
+| `WEB_PORT`              | docker compose     | `8080`                                     |
+| `PHOTO_DIR`             | docker compose     | `./storage/attendance-photos`              |
 
 ## Security notes
 
@@ -409,6 +458,8 @@ Defaults work for local development. These environment variables can override th
 - Each service uses its own DB user that only has access to its own database.
 - Uploaded photos are checked by their file signature (not only the extension),
   saved with a random file name, and can only be viewed with a valid token.
+- In Docker the services run as a normal user (not root), and nginx adds
+  basic security headers (`X-Frame-Options`, `X-Content-Type-Options`, ...).
 
 ## Design decisions
 
@@ -437,7 +488,7 @@ Defaults work for local development. These environment variables can override th
 - Camera and GPS come from the browser, so a virtual camera or a fake GPS app
   can still be used. Uploaded photos keep their EXIF metadata.
 - Photos are stored on the local disk. A real deployment would use object
-  storage (for example S3) and HTTPS in front of the services.
+  storage (for example S3) and HTTPS in front of nginx.
 - The login rate limit is kept in memory, so it resets when the service restarts.
 
 ## Screenshots

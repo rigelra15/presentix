@@ -21,3 +21,14 @@ jobs:
       - run: npm run lint
       - run: npm test
       - run: npm run build
+
+  # Make sure the Docker images still build
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # compose.yaml points to the secret files, so they must exist
+      - run: node scripts/setup-secrets.mjs
+
+      - run: docker compose --profile app build
