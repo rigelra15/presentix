@@ -10,10 +10,15 @@ import {
   ParseIntPipe,
   Patch,
   Post,
+  Put,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
+  Header,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiBody, ApiConsumes, ApiTags } from '@nestjs/swagger';
 
 import { EmployeesService } from './employees.service.js';
 import { CreateEmployeeDto } from './dto/create-employee.dto.js';
@@ -50,6 +55,35 @@ export class EmployeesController {
     @Param('id', ParseIntPipe) id: number,
   ) {
     return this.employeesService.findOne(id);
+  }
+
+  // Profile photo, used by HRD to compare with check-in photos
+  @Put(':id/photo')
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['photo'],
+      properties: { photo: { type: 'string', format: 'binary' } },
+    },
+  })
+  @UseInterceptors(
+    FileInterceptor('photo', {
+      limits: { fileSize: 5 * 1024 * 1024, files: 1, fields: 0, parts: 1 },
+    }),
+  )
+  setPhoto(
+    @Param('id', ParseIntPipe) id: number,
+    @UploadedFile() file?: Express.Multer.File,
+  ) {
+    return this.employeesService.setPhoto(id, file);
+  }
+
+  @Get(':id/photo')
+  @Header('Cache-Control', 'private, no-store')
+  @Header('X-Content-Type-Options', 'nosniff')
+  getPhoto(@Param('id', ParseIntPipe) id: number) {
+    return this.employeesService.getPhoto(id);
   }
 
   @Post()

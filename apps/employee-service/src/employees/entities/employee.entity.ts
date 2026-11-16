@@ -49,4 +49,13 @@ export class Employee {
     default: true,
   })
   isActive!: boolean;
+
+  // File name of the profile photo, empty until HRD uploads one
+  @Column({
+    name: 'photo_path',
+    type: 'varchar',
+    length: 100,
+    nullable: true,
+  })
+  photoPath!: string | null;
 }
