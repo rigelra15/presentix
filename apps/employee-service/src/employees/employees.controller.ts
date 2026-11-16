@@ -16,13 +16,14 @@ import {
   UseInterceptors,
   Header,
 } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
 
 import { ApiBearerAuth, ApiBody, ApiConsumes, ApiTags } from '@nestjs/swagger';
 
 import { EmployeesService } from './employees.service.js';
 import { CreateEmployeeDto } from './dto/create-employee.dto.js';
 import { UpdateEmployeeDto } from './dto/update-employee.dto.js';
+import { ReviewPhotoDto } from './dto/review-photo.dto.js';
+import { PhotoUploadInterceptor, photoUploadBody } from './photo-upload.js';
 
 import { UserRole } from '../users/user-role.enum.js';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard.js';
@@ -50,6 +51,12 @@ export class EmployeesController {
     return this.employeesService.getNextCode();
   }
 
+  // Employees waiting for HRD to approve a new profile photo
+  @Get('photo-requests')
+  findPhotoRequests() {
+    return this.employeesService.findPhotoRequests();
+  }
+
   @Get(':id')
   findOne(
     @Param('id', ParseIntPipe) id: number,
@@ -60,18 +67,8 @@ export class EmployeesController {
   // Profile photo, used by HRD to compare with check-in photos
   @Put(':id/photo')
   @ApiConsumes('multipart/form-data')
-  @ApiBody({
-    schema: {
-      type: 'object',
-      required: ['photo'],
-      properties: { photo: { type: 'string', format: 'binary' } },
-    },
-  })
-  @UseInterceptors(
-    FileInterceptor('photo', {
-      limits: { fileSize: 5 * 1024 * 1024, files: 1, fields: 0, parts: 1 },
-    }),
-  )
+  @ApiBody(photoUploadBody)
+  @UseInterceptors(PhotoUploadInterceptor)
   setPhoto(
     @Param('id', ParseIntPipe) id: number,
     @UploadedFile() file?: Express.Multer.File,
@@ -84,6 +81,32 @@ export class EmployeesController {
   @Header('X-Content-Type-Options', 'nosniff')
   getPhoto(@Param('id', ParseIntPipe) id: number) {
     return this.employeesService.getPhoto(id);
+  }
+
+  // The new photo the employee sent, shown to HRD before approving
+  @Get(':id/photo-request')
+  @Header('Cache-Control', 'private, no-store')
+  @Header('X-Content-Type-Options', 'nosniff')
+  getRequestedPhoto(@Param('id', ParseIntPipe) id: number) {
+    return this.employeesService.getPhoto(id, 'pending');
+  }
+
+  @Post(':id/photo-request/approve')
+  @HttpCode(HttpStatus.OK)
+  approvePhotoRequest(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: ReviewPhotoDto,
+  ) {
+    return this.employeesService.approvePhotoRequest(id, dto.submittedAt);
+  }
+
+  @Post(':id/photo-request/reject')
+  @HttpCode(HttpStatus.OK)
+  rejectPhotoRequest(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: ReviewPhotoDto,
+  ) {
+    return this.employeesService.rejectPhotoRequest(id, dto.submittedAt);
   }
 
   @Post()

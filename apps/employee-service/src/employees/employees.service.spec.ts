@@ -175,3 +175,100 @@ describe('EmployeesService profile photo', () => {
     await expect(service.getPhoto(1)).rejects.toThrow('Photo not found');
   });
 });
+
+describe('EmployeesService photo requests', () => {
+  let photoDir: string;
+  // One employee row kept in memory
+  let row: Record<string, unknown>;
+
+  const jpeg = { buffer: Buffer.from([0xff, 0xd8, 0xff, 0xe0, 9]), mimetype: 'image/jpeg' } as Express.Multer.File;
+
+  function createService() {
+    const repository = {
+      findOne: async () => ({ ...row, user: { email: 'emp@example.test' } }),
+      // Like SQL: only update when every "where" value matches
+      update: async (where: Record<string, unknown>, values: Record<string, unknown>) => {
+        const matches = Object.entries(where).every(([key, value]) => row[key] === value);
+        if (matches) Object.assign(row, values);
+        return { affected: matches ? 1 : 0 };
+      },
+    } as unknown as Repository<Employee>;
+
+    return new EmployeesService(repository, {} as DataSource);
+  }
+
+  async function files() {
+    const { readdir } = await import('node:fs/promises');
+    return (await readdir(photoDir)).sort();
+  }
+
+  beforeEach(async () => {
+    const { mkdtemp } = await import('node:fs/promises');
+    const { tmpdir } = await import('node:os');
+    photoDir = await mkdtemp(`${tmpdir()}/employee-photos-`);
+    process.env.EMPLOYEE_PHOTO_DIR = photoDir;
+    row = { id: 7, isActive: true, photoPath: null, pendingPhotoPath: null, pendingPhotoAt: null, photoRejectedAt: null };
+  });
+
+  afterEach(async () => {
+    const { rm } = await import('node:fs/promises');
+    await rm(photoDir, { recursive: true, force: true });
+    delete process.env.EMPLOYEE_PHOTO_DIR;
+  });
+
+  it('keeps the employee photo pending until HRD approves it', async () => {
+    const service = createService();
+
+    const request = await service.requestPhoto(7, jpeg);
+    expect(request.hasPhoto).toBe(false);
+    expect(request.photoRequestAt).toBeInstanceOf(Date);
+
+    const approved = await service.approvePhotoRequest(7, request.photoRequestAt!.toISOString());
+    expect(approved.hasPhoto).toBe(true);
+    expect(approved.photoRequestAt).toBeNull();
+    expect(row.photoPath).toMatch(/^[0-9a-f-]{36}\.jpg$/);
+    expect(await files()).toEqual([row.photoPath]);
+  });
+
+  it('removes the photo when HRD rejects it', async () => {
+    const service = createService();
+    const request = await service.requestPhoto(7, jpeg);
+
+    const rejected = await service.rejectPhotoRequest(7, request.photoRequestAt!.toISOString());
+
+    expect(rejected.hasPhoto).toBe(false);
+    expect(rejected.photoRejectedAt).toBeInstanceOf(Date);
+    expect(await files()).toEqual([]);
+  });
+
+  it('does not approve a newer photo that HRD has not seen', async () => {
+    const service = createService();
+    const first = await service.requestPhoto(7, jpeg);
+    const seenByHrd = first.photoRequestAt!.toISOString();
+
+    // The employee sends another photo while HRD is looking at the first one
+    await new Promise((resolve) => setTimeout(resolve, 5));
+    await service.requestPhoto(7, jpeg);
+
+    await expect(service.approvePhotoRequest(7, seenByHrd)).rejects.toThrow('sent a new photo');
+    expect(row.photoPath).toBeNull();
+    // Only the newest request is kept on disk
+    expect(await files()).toEqual([row.pendingPhotoPath]);
+  });
+
+  it('only lets employee accounts send a photo request', async () => {
+    const service = createService();
+
+    await expect(service.requestPhoto(undefined, jpeg)).rejects.toThrow('Only employees');
+  });
+
+  it('removes the request when the employee cancels it', async () => {
+    const service = createService();
+    await service.requestPhoto(7, jpeg);
+
+    const result = await service.cancelPhotoRequest(7);
+
+    expect(result.photoRequestAt).toBeNull();
+    expect(await files()).toEqual([]);
+  });
+});

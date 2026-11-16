@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { Employee } from './entities/employee.entity.js';
 import { EmployeesController } from './employees.controller.js';
+import { MyProfileController } from './my-profile.controller.js';
 import { EmployeesService } from './employees.service.js';
 import { AuthModule } from '../auth/auth.module.js';
 
@@ -11,7 +12,7 @@ import { AuthModule } from '../auth/auth.module.js';
     TypeOrmModule.forFeature([Employee]),
     AuthModule
   ],
-  controllers: [EmployeesController],
+  controllers: [EmployeesController, MyProfileController],
   providers: [EmployeesService],
   exports: [TypeOrmModule],
 })

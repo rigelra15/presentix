@@ -1,6 +1,6 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException, ServiceUnavailableException, StreamableFile } from "@nestjs/common";
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException, ServiceUnavailableException, StreamableFile } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { DataSource, QueryFailedError } from "typeorm";
+import { DataSource, IsNull, Not, QueryFailedError } from "typeorm";
 import type { Repository } from "typeorm";
 import * as argon2 from 'argon2';
 import { randomUUID } from 'node:crypto';
@@ -41,6 +41,9 @@ export class EmployeesService {
       department: employee.department,
       isActive: employee.isActive,
       hasPhoto: employee.photoPath !== null,
+      // A new photo from the employee that waits for HRD (null = none)
+      photoRequestAt: employee.pendingPhotoAt,
+      photoRejectedAt: employee.photoRejectedAt,
       email: employee.user.email,
       // Account creation time = the employee's first day in the system
       createdAt: employee.user.createdAt,
@@ -264,6 +267,7 @@ export class EmployeesService {
     });
 
     await this.removePhotoFile(employee.photoPath);
+    await this.removePhotoFile(employee.pendingPhotoPath);
 
     return { id, deleted: true };
   }
@@ -281,30 +285,10 @@ export class EmployeesService {
     return this.findOne(id);
   }
 
-  // HRD uploads a profile photo. It replaces the old one.
+  // HRD uploads a profile photo. It replaces the old one right away.
   async setPhoto(id: number, file: Express.Multer.File | undefined) {
-    const employee = await this.employees.findOne({
-      where: { id },
-      relations: { user: true },
-    });
-
-    if (!employee) {
-      throw new NotFoundException('Employee not found');
-    }
-
-    const extension = file ? getImageExtension(file) : null;
-
-    if (!file || !extension) {
-      throw new BadRequestException('Please upload a JPEG or PNG photo.');
-    }
-
-    await mkdir(this.photoDir, { recursive: true, mode: 0o700 });
-
-    const filename = `${randomUUID()}.${extension}`;
-    await writeFile(join(this.photoDir, filename), file.buffer, {
-      flag: 'wx',
-      mode: 0o600,
-    });
+    const employee = await this.findEmployee(id);
+    const filename = await this.savePhotoFile(file);
 
     try {
       await this.employees.update({ id }, { photoPath: filename });
@@ -320,13 +304,15 @@ export class EmployeesService {
     return this.toResponse(employee);
   }
 
-  async getPhoto(id: number) {
+  // which: the approved photo, or the photo that waits for HRD
+  async getPhoto(id: number, which: 'photo' | 'pending' = 'photo') {
     const employee = await this.employees.findOne({
       where: { id },
-      select: { id: true, photoPath: true },
+      select: { id: true, photoPath: true, pendingPhotoPath: true },
     });
 
-    const filename = employee?.photoPath;
+    const filename =
+      which === 'pending' ? employee?.pendingPhotoPath : employee?.photoPath;
 
     if (!filename || !PHOTO_NAME.test(filename)) {
       throw new NotFoundException('Photo not found');
@@ -348,6 +334,166 @@ export class EmployeesService {
       type: filename.endsWith('.png') ? 'image/png' : 'image/jpeg',
       disposition: 'inline',
     });
+  }
+
+  // ---- Photo requests ----
+  // An employee cannot change their photo directly. The new photo waits
+  // until HRD approves it, so nobody can swap in another person's face.
+
+  // The logged-in employee's own data (no id in the URL, so they cannot
+  // read other employees)
+  async getMyProfile(employeeId: number | undefined) {
+    return this.toResponse(await this.findEmployee(this.ownId(employeeId)));
+  }
+
+  async requestPhoto(employeeId: number | undefined, file: Express.Multer.File | undefined) {
+    const employee = await this.findEmployee(this.ownId(employeeId));
+    const filename = await this.savePhotoFile(file);
+    const now = new Date();
+
+    try {
+      await this.employees.update(
+        { id: employee.id },
+        { pendingPhotoPath: filename, pendingPhotoAt: now, photoRejectedAt: null },
+      );
+    } catch (error) {
+      await this.removePhotoFile(filename);
+      throw error;
+    }
+
+    // A newer request replaces the one HRD has not looked at yet
+    await this.removePhotoFile(employee.pendingPhotoPath);
+
+    employee.pendingPhotoPath = filename;
+    employee.pendingPhotoAt = now;
+    employee.photoRejectedAt = null;
+    return this.toResponse(employee);
+  }
+
+  async cancelPhotoRequest(employeeId: number | undefined) {
+    const employee = await this.findEmployee(this.ownId(employeeId));
+
+    if (employee.pendingPhotoPath) {
+      await this.employees.update(
+        { id: employee.id },
+        { pendingPhotoPath: null, pendingPhotoAt: null },
+      );
+      await this.removePhotoFile(employee.pendingPhotoPath);
+    }
+
+    employee.pendingPhotoPath = null;
+    employee.pendingPhotoAt = null;
+    return this.toResponse(employee);
+  }
+
+  getMyPhoto(employeeId: number | undefined, which: 'photo' | 'pending') {
+    return this.getPhoto(this.ownId(employeeId), which);
+  }
+
+  // For HRD: oldest request first
+  async findPhotoRequests() {
+    const employees = await this.employees.find({
+      where: { pendingPhotoPath: Not(IsNull()) },
+      relations: { user: true },
+      order: { pendingPhotoAt: 'ASC' },
+    });
+
+    return employees.map((employee) => this.toResponse(employee));
+  }
+
+  async approvePhotoRequest(id: number, submittedAt: string) {
+    const employee = await this.findRequest(id, submittedAt);
+    const newPhoto = employee.pendingPhotoPath!;
+
+    // Only update when the request is still the same one, in case the
+    // employee sent a new photo a moment ago
+    const result = await this.employees.update(
+      { id, pendingPhotoPath: newPhoto },
+      { photoPath: newPhoto, pendingPhotoPath: null, pendingPhotoAt: null, photoRejectedAt: null },
+    );
+
+    if (!result.affected) {
+      throw new ConflictException('The employee sent a new photo. Please review it again.');
+    }
+
+    await this.removePhotoFile(employee.photoPath);
+
+    return this.findOne(id);
+  }
+
+  async rejectPhotoRequest(id: number, submittedAt: string) {
+    const employee = await this.findRequest(id, submittedAt);
+    const rejectedPhoto = employee.pendingPhotoPath!;
+
+    const result = await this.employees.update(
+      { id, pendingPhotoPath: rejectedPhoto },
+      { pendingPhotoPath: null, pendingPhotoAt: null, photoRejectedAt: new Date() },
+    );
+
+    if (!result.affected) {
+      throw new ConflictException('The employee sent a new photo. Please review it again.');
+    }
+
+    await this.removePhotoFile(rejectedPhoto);
+
+    return this.findOne(id);
+  }
+
+  // Finds the request HRD looked at. submittedAt must match, so HRD never
+  // approves a newer photo that they have not seen.
+  private async findRequest(id: number, submittedAt: string) {
+    const employee = await this.findEmployee(id);
+
+    if (!employee.pendingPhotoPath || !employee.pendingPhotoAt) {
+      throw new NotFoundException('This employee has no photo request.');
+    }
+
+    if (employee.pendingPhotoAt.getTime() !== new Date(submittedAt).getTime()) {
+      throw new ConflictException('The employee sent a new photo. Please review it again.');
+    }
+
+    return employee;
+  }
+
+  private async findEmployee(id: number) {
+    const employee = await this.employees.findOne({
+      where: { id },
+      relations: { user: true },
+    });
+
+    if (!employee) {
+      throw new NotFoundException('Employee not found');
+    }
+
+    return employee;
+  }
+
+  // Employee accounts always have an employee id. HRD accounts do not.
+  private ownId(employeeId: number | undefined) {
+    if (!employeeId) {
+      throw new ForbiddenException('Only employees have a profile photo.');
+    }
+
+    return employeeId;
+  }
+
+  // Checks the image and saves it with a random name
+  private async savePhotoFile(file: Express.Multer.File | undefined) {
+    const extension = file ? getImageExtension(file) : null;
+
+    if (!file || !extension) {
+      throw new BadRequestException('Please upload a JPEG or PNG photo.');
+    }
+
+    await mkdir(this.photoDir, { recursive: true, mode: 0o700 });
+
+    const filename = `${randomUUID()}.${extension}`;
+    await writeFile(join(this.photoDir, filename), file.buffer, {
+      flag: 'wx',
+      mode: 0o600,
+    });
+
+    return filename;
   }
 
   // A missing old file is not a problem, so errors are ignored
