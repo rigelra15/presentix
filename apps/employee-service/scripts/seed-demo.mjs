@@ -31,11 +31,11 @@ if (existsSync(credentialsPath)) {
 } else {
   credentials = {
     hrd: {
-      email: 'hrd.demo@example.test',
+      email: 'hrd.demo@dexagroup.com',
       password: randomBytes(24).toString('base64url'),
     },
     employee: {
-      email: 'employee.demo@example.test',
+      email: 'employee.demo@dexagroup.com',
       password: randomBytes(24).toString('base64url'),
     },
   };

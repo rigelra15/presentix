@@ -3,6 +3,8 @@ import { Navigate, useNavigate } from 'react-router-dom'
 import { Camera, LogIn, MapPin, ShieldCheck } from 'lucide-react'
 import { homePathFor, useAuth } from '../lib/auth-context'
 import { Alert } from '../components/ui'
+import BrandMark from '../components/BrandMark'
+import { APP_NAME, EMAIL_DOMAIN } from '../lib/brand'
 
 export default function LoginPage() {
   const { session, login } = useAuth()
@@ -36,8 +38,8 @@ export default function LoginPage() {
     <div className="login-page">
       <section className="login-hero">
         <div className="login-hero-brand">
-          <span className="brand-mark">W</span>
-          <strong>WFH Attendance</strong>
+          <BrandMark />
+          <strong>{APP_NAME}</strong>
         </div>
 
         <div>
@@ -68,7 +70,7 @@ export default function LoginPage() {
               autoComplete="username"
               value={email}
               onChange={event => setEmail(event.target.value)}
-              placeholder="name@company.com"
+              placeholder={`name@${EMAIL_DOMAIN}`}
               required
             />
           </label>

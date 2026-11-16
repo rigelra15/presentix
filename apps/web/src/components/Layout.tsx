@@ -12,6 +12,8 @@ import {
   X
 } from 'lucide-react'
 import { useSession, useAuth } from '../lib/auth-context'
+import { APP_NAME } from '../lib/brand'
+import BrandMark from './BrandMark'
 
 const hrdMenu = [
   { to: '/hrd', label: 'Overview', icon: LayoutDashboard, end: true },
@@ -43,9 +45,9 @@ export default function Layout() {
     <div className="app-shell">
       <aside className={`sidebar ${menuOpen ? 'open' : ''}`}>
         <div className="sidebar-brand">
-          <span className="brand-mark">W</span>
+          <BrandMark />
           <div>
-            <strong>WFH Attendance</strong>
+            <strong>{APP_NAME}</strong>
             <small>{user.role === 'HRD' ? 'HRD Portal' : 'Employee Portal'}</small>
           </div>
           <button
@@ -102,7 +104,7 @@ export default function Layout() {
           >
             <Menu size={22} />
           </button>
-          <strong>WFH Attendance</strong>
+          <strong>{APP_NAME}</strong>
         </header>
 
         <main className="page">

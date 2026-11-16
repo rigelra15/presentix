@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ArrowLeft, Eye, EyeOff, Save, Trash2, UserCheck, UserX } from 'lucide-react'
 import { api, type Employee } from '../../lib/api'
 import { useSession } from '../../lib/auth-context'
+import { EMAIL_DOMAIN, suggestEmail } from '../../lib/brand'
 import { Alert, Loading, PageHeader, StatusBadge } from '../../components/ui'
 import EmployeeActionDialog, { type EmployeeAction } from '../../components/EmployeeActionDialog'
 
@@ -38,6 +39,8 @@ export default function EmployeeFormPage() {
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [showPassword, setShowPassword] = useState(false)
+  // True once HRD types the email. Then the name no longer changes it.
+  const [emailEdited, setEmailEdited] = useState(false)
   const [dialog, setDialog] = useState<EmployeeAction | null>(null)
 
   // When adding, fill in the next free employee code.
@@ -78,6 +81,22 @@ export default function EmployeeFormPage() {
 
   function updateField(field: keyof EmployeeForm, value: string) {
     setForm(current => ({ ...current, [field]: value }))
+  }
+
+  // When adding, the email is filled in from the name
+  // (e.g. "Budi Santoso" -> budi.santoso@company domain)
+  function updateFullName(value: string) {
+    setForm(current => ({
+      ...current,
+      fullName: value,
+      email: isEdit || emailEdited ? current.email : suggestEmail(value)
+    }))
+  }
+
+  function updateEmail(value: string) {
+    // Emptying the field turns the automatic email back on
+    setEmailEdited(value !== '')
+    updateField('email', value)
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -183,7 +202,7 @@ export default function EmployeeFormPage() {
               <span>Full name</span>
               <input
                 value={form.fullName}
-                onChange={event => updateField('fullName', event.target.value)}
+                onChange={event => updateFullName(event.target.value)}
                 placeholder="e.g. Budi Santoso"
                 maxLength={150}
                 required
@@ -233,12 +252,15 @@ export default function EmployeeFormPage() {
               <input
                 type="email"
                 value={form.email}
-                onChange={event => updateField('email', event.target.value)}
-                placeholder="name@company.com"
+                onChange={event => updateEmail(event.target.value)}
+                placeholder={`name@${EMAIL_DOMAIN}`}
                 maxLength={255}
                 autoComplete="off"
                 required
               />
+              {!isEdit && (
+                <small className="muted">Filled in from the full name. You can change it.</small>
+              )}
             </label>
 
             {!isEdit && (

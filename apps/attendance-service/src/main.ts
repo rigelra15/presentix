@@ -7,7 +7,7 @@ async function bootstrap() {
 
   // API docs at /docs (Swagger UI) and /docs-json (OpenAPI file)
   const config = new DocumentBuilder()
-    .setTitle('Attendance Service')
+    .setTitle('Hearthroll Attendance Service')
     .setDescription('WFH check-in with photo and location, history and HRD monitoring.')
     .setVersion('1.0')
     .addBearerAuth()
